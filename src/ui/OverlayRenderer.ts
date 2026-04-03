@@ -3,8 +3,8 @@ import type { Player } from '../player/Player';
 import type { SkillTree as TalentTree } from '../player/SkillTree';
 import { STAT_LABELS, STAT_DESCRIPTIONS, STAT_ICONS,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS,
-  TALENT_POINT_EVERY, TOWER_DEFS,
-  ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS } from '../constants';
+  TALENT_POINT_EVERY } from '../constants';
+import { towerRegistry, enemyRegistry } from '../registries';
 import type { Rect } from './RenderUtils';
 import { btn, rr, mulberry32, wrapText, wrapTextLeft } from './RenderUtils';
 
@@ -240,7 +240,7 @@ export class OverlayRenderer {
 
     if (this.bestiaryPage === 0) {
       const cols = 2, bw = (cw - 60) / cols, bh = 160, gap = 12;
-      TOWER_DEFS.forEach((def, i) => {
+      towerRegistry.getAllDefs().forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
         const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
         const ec = ELEMENT_COLORS[def.element];
@@ -272,7 +272,7 @@ export class OverlayRenderer {
     }
 
     else if (this.bestiaryPage === 1) {
-      const allEnemies = [...ENEMY_DEFS, ...BOSS_DEFS];
+      const allEnemies = [...enemyRegistry.getStandardDefs(), ...enemyRegistry.getBossDefs()];
       const cols = 2, bw = (cw - 60) / cols, bh = 130, gap = 10;
       allEnemies.forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
@@ -301,7 +301,7 @@ export class OverlayRenderer {
 
     else {
       const bw = (cw - 60) / 2, bh = 150, gap = 12;
-      GOLEM_DEFS.forEach((def, i) => {
+      enemyRegistry.getGolemDefs().forEach((def, i) => {
         const col = i % 2, row = Math.floor(i / 2);
         const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
         const ec = ELEMENT_COLORS[def.golemType!];

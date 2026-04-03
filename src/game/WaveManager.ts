@@ -1,6 +1,6 @@
-import { ENEMY_DEFS, BOSS_DEFS, GOLEM_DEFS } from '../constants';
 import { GameConfig } from '../config';
 import { createEnemy, resetEnemyIds } from '../entities/Enemy';
+import { enemyRegistry } from '../registries';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { Vec2 } from '../types';
 
@@ -88,8 +88,9 @@ export class WaveManager {
     const rng = waveRng(this.currentWave * 1337 + 7);
 
     if (this.isBossWave) {
-      const bossIdx = Math.max(0, Math.floor((this.currentWave - 10) / 10)) % BOSS_DEFS.length;
-      const boss = BOSS_DEFS[bossIdx];
+      const bossDefs = enemyRegistry.getBossDefs();
+      const bossIdx = Math.max(0, Math.floor((this.currentWave - 10) / 10)) % bossDefs.length;
+      const boss = bossDefs[bossIdx];
       this.spawnQueues = [{ typeId: boss.id, count: 1, timer: 0, spawned: 0, isBoss: true, isElite: false }];
     } else {
       // Pick enemy types
@@ -136,16 +137,13 @@ export class WaveManager {
     const spawned: BaseEnemy[] = [];
     const dtMs = dt * 1000;
 
-    // All enemy defs combined
-    const allDefs = [...ENEMY_DEFS, ...GOLEM_DEFS, ...BOSS_DEFS];
-
     let allDone = true;
     for (const q of this.spawnQueues) {
       if (q.spawned < q.count) {
         allDone = false;
         q.timer -= dtMs;
         if (q.timer <= 0) {
-          const def = allDefs.find(d => d.id === q.typeId);
+          const def = enemyRegistry.getDef(q.typeId);
           if (!def) { q.spawned++; continue; }
           const eliteMult = q.isElite ? eliteMultForWave(this.currentWave) : 1;
           // Use the factory — picks BossEnemy / GolemEnemy / StandardEnemy automatically
@@ -174,8 +172,9 @@ export class WaveManager {
     const nextWave = this.currentWave + 1;
     const isBoss = nextWave % 10 === 0;
     if (isBoss) {
-      const bossIdx = Math.max(0, Math.floor((nextWave - 10) / 10)) % BOSS_DEFS.length;
-      return { types: [BOSS_DEFS[bossIdx].id], isBoss: true, eliteCount: 0, enemyCount: 1 };
+      const bossDefs = enemyRegistry.getBossDefs();
+      const bossIdx = Math.max(0, Math.floor((nextWave - 10) / 10)) % bossDefs.length;
+      return { types: [bossDefs[bossIdx].id], isBoss: true, eliteCount: 0, enemyCount: 1 };
     }
     const rng = waveRng(nextWave * 1337 + 7);
     const pool = getEnemyPool(nextWave);

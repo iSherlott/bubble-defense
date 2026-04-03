@@ -3,7 +3,7 @@ import type { IGameContext } from '../core/GameContext';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import { BossEnemy } from '../entities/enemies/BossEnemy';
 import { createEnemy } from '../entities/Enemy';
-import { ENEMY_DEFS } from '../constants';
+import { enemyRegistry } from '../registries';
 
 // ─── Summon Adds (Goblin King) ───────────────────────────────────────────────
 
@@ -14,7 +14,7 @@ export class SummonAddsBehavior implements EnemyBehavior {
     if (!(enemy instanceof BossEnemy)) return;
     const spawnTrigger = enemy.checkAddSpawn();
     if (spawnTrigger > 0) {
-      const goblinDef = ENEMY_DEFS.find(d => d.id === 'goblin')!;
+      const goblinDef = enemyRegistry.getDef('goblin')!;
       for (let i = 0; i < 2; i++) {
         const add = createEnemy(goblinDef, ctx.waveManager.currentWave, 1);
         add.distanceTraveled = Math.max(0, enemy.distanceTraveled - 30 - i * 20);

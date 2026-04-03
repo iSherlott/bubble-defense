@@ -77,7 +77,7 @@ export class EffectSystem {
         hitCount++;
       }
     }
-    ctx.renderer.triggerAoe(
+    ctx.triggerAoeFlash(
       ctx.map.gameWidth / 2, ctx.map.gameHeight / 2,
       Math.max(ctx.map.gameWidth, ctx.map.gameHeight),
     );

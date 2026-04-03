@@ -1,16 +1,17 @@
-import type { Vec2, ElementType, OwnedItem, ItemDropAnim } from '../types';
+import type { Vec2, ElementType, OwnedItem, ItemDropAnim, ItemDef } from '../types';
 import type { BaseTower as Tower } from '../entities/BaseTower';
 import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
 import type { Player } from '../player/Player';
 import type { WaveManager } from '../game/WaveManager';
 import type { UpgradePopup } from '../game/Game';
 import type { MapData } from '../game/MapGenerator';
-import { CELL_SIZE, SIDEBAR_W, WAVE_BAR_H, TOWER_DEFS,
+import { CELL_SIZE, SIDEBAR_W, WAVE_BAR_H,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS,
   MAX_LEVEL, TALENT_POINT_EVERY, MAX_TOWER_LEVEL, MAP_EXPAND_COST,
-  ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS, ITEM_DEFS, ITEM_RARITY_COLORS,
+  ITEM_RARITY_COLORS,
   ITEM_RARITY_NAMES, getFusionDef } from '../constants';
 import { GameConfig } from '../config';
+import { towerRegistry, enemyRegistry, itemRegistry } from '../registries';
 import type { Rect } from './RenderUtils';
 import { btn, rr, wrapText } from './RenderUtils';
 import type { EntityRenderer } from './EntityRenderer';
@@ -122,7 +123,7 @@ export class GameRenderer {
       if (isMoving && g.movingTower) {
         ctx.globalAlpha = 0.4; this.entityRenderer.drawTower(ctx, g.movingTower); ctx.globalAlpha = 1;
       } else if (!blocked && g.selectedTowerType) {
-        const def = TOWER_DEFS.find(d => d.id === g.selectedTowerType);
+        const def = towerRegistry.has(g.selectedTowerType) ? towerRegistry.getDef(g.selectedTowerType) : null;
         if (def) {
           ctx.beginPath(); ctx.arc(hc.x * CELL_SIZE + CELL_SIZE / 2, hc.y * CELL_SIZE + CELL_SIZE / 2, def.baseRange, 0, Math.PI * 2);
           ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1; ctx.stroke();
@@ -209,7 +210,6 @@ export class GameRenderer {
   private renderWaveBar(ctx: CanvasRenderingContext2D, gw: number, gh: number, wm: WaveManager, enemies: Enemy[]) {
     const barY = gh;
     const barW = gw;
-    const allDefs = [...ENEMY_DEFS, ...GOLEM_DEFS, ...BOSS_DEFS];
 
     ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, barY, barW + SIDEBAR_W, WAVE_BAR_H);
     ctx.strokeStyle = '#252540'; ctx.lineWidth = 1;
@@ -246,7 +246,7 @@ export class GameRenderer {
       } else {
         const preview = wm.getNextWavePreview();
         const names = preview.types.map(id => {
-          const d = allDefs.find(d => d.id === id);
+          const d = enemyRegistry.getDef(id);
           return d ? d.name : id;
         });
         let txt = `Próxima: Onda ${wm.currentWave + 1}  ▸  `;
@@ -274,11 +274,11 @@ export class GameRenderer {
     rr(ctx, hx, hy, totalW, iconSize + padding * 2, 6); ctx.stroke();
 
     let ix = hx + padding;
-    let hoveredDef: (typeof ITEM_DEFS)[0] | null = null;
+    let hoveredDef: ItemDef | null = null;
     let hoveredX = 0, hoveredStacks = 1;
 
     for (const owned of items) {
-      const def = ITEM_DEFS.find(d => d.id === owned.defId);
+      const def = itemRegistry.getDef(owned.defId);
       if (!def) continue;
       const rc = ITEM_RARITY_COLORS[def.rarity];
       const itemRect = { x: ix, y: hy + padding, w: iconSize, h: iconSize };
@@ -502,7 +502,7 @@ export class GameRenderer {
 
       const canExpand = g.currentMapTier < 3 && wm.betweenWaves;
       let discountFrac = 0;
-      for (const owned of g.items) { const def = ITEM_DEFS.find(d => d.id === owned.defId); if (def && def.effectType === 'discount') discountFrac += def.effectValue * owned.stacks; }
+      for (const owned of g.items) { const def = itemRegistry.getDef(owned.defId); if (def && def.effectType === 'discount') discountFrac += def.effectValue * owned.stacks; }
       discountFrac = Math.min(0.6, discountFrac);
       const expCost = Math.round(MAP_EXPAND_COST * (1 - discountFrac));
       const expAfford = g.gold >= expCost;
@@ -539,7 +539,7 @@ export class GameRenderer {
     ctx.fillText(noSel ? 'Clique em torre para ações' : 'Clique no mapa para colocar', sx + 10, y); y += 12;
 
     this.towerSelRects.clear();
-    for (const def of TOWER_DEFS) {
+    for (const def of towerRegistry.getAllDefs()) {
       const cost = state.towerCost(def.id);
       const rect = { x: sx + 4, y, w: sw - 8, h: 48 };
       const sel = g.selectedTowerType === def.id, afford = g.gold >= cost;
@@ -676,7 +676,7 @@ export class GameRenderer {
       ctx.fillText('➕ Adicionar 2ª Torre:', px + 10, ry + 12);
       ry += 16;
       const bw2 = (pw - 20) / 2, bh2 = 20;
-      TOWER_DEFS.forEach((def, idx) => {
+      towerRegistry.getAllDefs().forEach((def, idx) => {
         const cost = towerCost(def.id) * 2;
         const af = gold >= cost;
         const bx = px + 8 + (idx % 2) * (bw2 + 4), by = ry + Math.floor(idx / 2) * (bh2 + 4);

@@ -28,4 +28,21 @@ export class EnemyRegistry {
   getDef(id: string): EnemyDef | undefined {
     return this.get(id)?.def;
   }
+
+  getAllDefs(): EnemyDef[] {
+    return this.getAll().map(bp => bp.def);
+  }
+
+  getBossDefs(): EnemyDef[] {
+    return this.getAllDefs().filter(d => d.isBoss);
+  }
+
+  getGolemDefs(): EnemyDef[] {
+    return this.getAllDefs().filter(d => !!d.golemType);
+  }
+
+  /** Non-boss, non-golem enemy defs */
+  getStandardDefs(): EnemyDef[] {
+    return this.getAllDefs().filter(d => !d.isBoss && !d.golemType);
+  }
 }

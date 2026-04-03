@@ -266,7 +266,7 @@ export class CombatSystem {
             t._sandstormAcc = { amount: 0.15, remaining: 5 };
           }
         }
-        ctx.renderer.triggerAoe(target.pos.x, target.pos.y, aoeR);
+        ctx.triggerAoeFlash(target.pos.x, target.pos.y, aoeR);
         break;
       }
       case 'wind': {

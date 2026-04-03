@@ -36,7 +36,7 @@ export class AoeFusionBehavior implements FusionBehavior {
         components: dualComponents,
       }));
     }
-    ctx.renderer.triggerAoe(targets[0].pos.x, targets[0].pos.y, tower.getRange() * 0.6);
+    ctx.triggerAoeFlash(targets[0].pos.x, targets[0].pos.y, tower.getRange() * 0.6);
   }
 }
 
@@ -121,7 +121,7 @@ export class BlizzardFusionBehavior implements FusionBehavior {
       t.stunRemaining = Math.max(t.stunRemaining, 1.0);
       t.addPermanentSlow();
     }
-    ctx.renderer.triggerAoe(primary.pos.x, primary.pos.y, tower.getRange() * 0.5);
+    ctx.triggerAoeFlash(primary.pos.x, primary.pos.y, tower.getRange() * 0.5);
   }
 }
 
@@ -184,7 +184,7 @@ export class SolarCoreFusionBehavior implements FusionBehavior {
       x: primary.pos.x, y: primary.pos.y,
       radius: tower.getRange() * 0.5, remaining: 6, dmgPerSec: baseDmg * 0.15,
     });
-    ctx.renderer.triggerAoe(primary.pos.x, primary.pos.y, tower.getRange() * 0.7);
+    ctx.triggerAoeFlash(primary.pos.x, primary.pos.y, tower.getRange() * 0.7);
   }
 }
 
@@ -208,7 +208,7 @@ export class AbyssalVortexFusionBehavior implements FusionBehavior {
       x: primary.pos.x, y: primary.pos.y,
       radius: tower.getRange() * 0.6, remaining: 10, slowAmount: 0.15,
     });
-    ctx.renderer.triggerAoe(primary.pos.x, primary.pos.y, tower.getRange() * 0.6);
+    ctx.triggerAoeFlash(primary.pos.x, primary.pos.y, tower.getRange() * 0.6);
   }
 }
 
@@ -225,7 +225,7 @@ export class PrimalQuakeFusionBehavior implements FusionBehavior {
       }));
       t.stunRemaining = Math.max(t.stunRemaining, 0.5);
     }
-    ctx.renderer.triggerAoe(
+    ctx.triggerAoeFlash(
       ctx.map.gameWidth / 2, ctx.map.gameHeight / 2,
       Math.max(ctx.map.gameWidth, ctx.map.gameHeight),
     );
@@ -255,7 +255,7 @@ export class EternalHurricaneFusionBehavior implements FusionBehavior {
         t.stunRemaining = Math.max(t.stunRemaining, 1.5);
       }
     }
-    ctx.renderer.triggerAoe(tower.pixelX, tower.pixelY, tower.getRange(extRange));
+    ctx.triggerAoeFlash(tower.pixelX, tower.pixelY, tower.getRange(extRange));
   }
 }
 

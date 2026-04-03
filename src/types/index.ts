@@ -187,13 +187,7 @@ export interface SaveData {
     lives: number;
     wave: number;
     score: number;
-    mapSeed?: number;      // legacy — kept for backward compat
-    /** Exact serialized map so the path is pixel-perfect on reload */
-    map?: {
-      cols: number; rows: number; tier: number;
-      waypoints: { x: number; y: number }[];
-      pathCells: string[];   // "col,row" strings
-    };
+    mapSeed?: number;
     items: Array<{ defId: string; stacks: number }>;
     towers: Array<{
       typeId: string;

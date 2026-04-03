@@ -741,6 +741,10 @@ export class Game implements IGameContext {
     });
   }
 
+  triggerAoeFlash(x: number, y: number, radius: number) {
+    this.renderer.triggerAoe(x, y, radius);
+  }
+
   // ─── Render ──────────────────────────────────────────────────────────────────
   private render() {
     this.renderer.setMousePos(this.mousePos);

@@ -5,7 +5,6 @@ import type { Player } from '../player/Player';
 import type { SkillTree } from '../player/SkillTree';
 import type { WaveManager } from '../game/WaveManager';
 import type { MapData } from '../game/MapGenerator';
-import type { Renderer } from '../ui/Renderer';
 
 // ─── Shared Types (moved from Game.ts) ──────────────────────────────────────
 
@@ -49,7 +48,6 @@ export interface IGameContext {
   readonly player: Player;
   readonly talentTree: SkillTree;
   readonly waveManager: WaveManager;
-  readonly renderer: Renderer;
 
   // Item drop animation
   itemDropAnim: ItemDropAnim | null;
@@ -59,4 +57,5 @@ export interface IGameContext {
 
   // Actions
   addFT(pos: Vec2, text: string, color: string): void;
+  triggerAoeFlash(x: number, y: number, radius: number): void;
 }
