@@ -12,14 +12,17 @@ export class BossEnemy extends BaseEnemy {
   addsSpawned: number;   // how many 25%-threshold triggers fired
 
   // shield_phase tracking
-  shieldActive: boolean;
+  private _shieldActive = false;
   shieldTimer: number;
   shieldTriggered: boolean;
+
+  override get shieldActive(): boolean { return this._shieldActive; }
+  set shieldActive(v: boolean) { this._shieldActive = v; }
 
   constructor(def: EnemyDef, wave = 1, eliteMult = 1) {
     super(def, wave, eliteMult);
     this.addsSpawned    = 0;
-    this.shieldActive   = false;
+    this._shieldActive  = false;
     this.shieldTimer    = 0;
     this.shieldTriggered = false;
   }

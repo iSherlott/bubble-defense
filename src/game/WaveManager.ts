@@ -1,9 +1,10 @@
 import { ENEMY_DEFS, BOSS_DEFS, GOLEM_DEFS } from '../constants';
-import { CFG_WAVE_BASE_COUNT, CFG_WAVE_COUNT_PER_WAVE, CFG_ELITE_START_WAVE,
-  CFG_ELITE_BASE_MULT, CFG_ELITE_MAX_MULT, CFG_ELITE_SCALE_WAVES } from '../settings';
+import { GameConfig } from '../config';
 import { createEnemy, resetEnemyIds } from '../entities/Enemy';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { Vec2 } from '../types';
+
+const cfg = GameConfig.get();
 
 interface SpawnQueue {
   typeId: string; count: number;
@@ -40,17 +41,17 @@ function typeCountForWave(wave: number): number {
   return 5;
 }
 
-/** Gradual elite multiplier: ramps from base to max over CFG_ELITE_SCALE_WAVES */
+/** Gradual elite multiplier: ramps from base to max */
 function eliteMultForWave(wave: number): number {
-  if (wave < CFG_ELITE_START_WAVE) return 1;
-  const progress = Math.min(1, (wave - CFG_ELITE_START_WAVE) / CFG_ELITE_SCALE_WAVES);
-  return CFG_ELITE_BASE_MULT + (CFG_ELITE_MAX_MULT - CFG_ELITE_BASE_MULT) * progress;
+  if (wave < cfg.enemy.eliteStartWave) return 1;
+  const progress = Math.min(1, (wave - cfg.enemy.eliteStartWave) / cfg.enemy.eliteScaleWaves);
+  return cfg.enemy.eliteBaseMult + (cfg.enemy.eliteMaxMult - cfg.enemy.eliteBaseMult) * progress;
 }
 
 /** How many elite units appear */
 function eliteCountForWave(wave: number): number {
-  if (wave < CFG_ELITE_START_WAVE) return 0;
-  return 1 + Math.floor((wave - CFG_ELITE_START_WAVE) / 10);
+  if (wave < cfg.enemy.eliteStartWave) return 0;
+  return 1 + Math.floor((wave - cfg.enemy.eliteStartWave) / 10);
 }
 
 export class WaveManager {
@@ -102,7 +103,7 @@ export class WaveManager {
       }
 
       // Total enemy count for the wave (divided among types)
-      const totalCount = Math.round(CFG_WAVE_BASE_COUNT + this.currentWave * CFG_WAVE_COUNT_PER_WAVE);
+      const totalCount = Math.round(cfg.enemy.waveBaseCount + this.currentWave * cfg.enemy.waveCountPerWave);
       const perType = Math.max(1, Math.round(totalCount / chosen.length));
 
       this.spawnQueues = chosen.map(typeId => ({
@@ -149,7 +150,7 @@ export class WaveManager {
           const eliteMult = q.isElite ? eliteMultForWave(this.currentWave) : 1;
           // Use the factory — picks BossEnemy / GolemEnemy / StandardEnemy automatically
           const e = createEnemy(def, this.currentWave, eliteMult);
-          if (q.isElite) (e as any)._elite = true;  // mark for rendering
+          if (q.isElite) e._elite = true;  // mark for rendering
           e.pos = { x: waypoints[0]?.x ?? 0, y: waypoints[0]?.y ?? 0 };
           spawned.push(e);
           q.spawned++;
@@ -185,7 +186,7 @@ export class WaveManager {
       const idx = Math.floor(rng() * poolCopy.length);
       chosen.push(poolCopy.splice(idx, 1)[0]);
     }
-    const totalCount = Math.round(CFG_WAVE_BASE_COUNT + nextWave * CFG_WAVE_COUNT_PER_WAVE);
+    const totalCount = Math.round(cfg.enemy.waveBaseCount + nextWave * cfg.enemy.waveCountPerWave);
     const elites = eliteCountForWave(nextWave);
     return { types: chosen, isBoss: false, eliteCount: elites, enemyCount: totalCount + elites };
   }

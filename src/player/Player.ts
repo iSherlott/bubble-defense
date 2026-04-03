@@ -1,11 +1,9 @@
 import type { Stats, StatKey, ElementType, ArchetypeDef } from '../types';
 import { XP_TABLE, MAX_LEVEL, TALENT_POINT_EVERY,
   MIN_STAT_VALUE, STARTING_STAT_TOTAL, ARCHETYPE_DEFS } from '../constants';
-import {
-  CFG_STRENGTH_DMG_BONUS, CFG_INTEL_MAGIC_BONUS, CFG_AGILITY_FIRERATE,
-  CFG_LUCK_CRIT_CHANCE, CFG_LUCK_CRIT_MULT, CFG_LUCK_GOLD_BONUS,
-  CFG_MIN_HIT_CHANCE, CFG_VITALITY_REGEN_PER_POINT,
-} from '../settings';
+import { GameConfig } from '../config';
+
+const C = GameConfig.get();
 
 export class Player {
   level: number;
@@ -102,46 +100,45 @@ export class Player {
   }
 
   // ─── Derived Stats ────────────────────────────────────────────────────────
-  /** Lives regenerated per wave: floor(vitality × CFG_VITALITY_REGEN_PER_POINT) */
+  /** Lives regenerated per wave: floor(vitality × vitalityRegenPerPoint) */
   vitalityRegen(): number {
-    return Math.floor(this.stats.vitality * CFG_VITALITY_REGEN_PER_POINT);
+    return Math.floor(this.stats.vitality * C.player.vitalityRegenPerPoint);
   }
 
   /** Crit chance as a fraction (0.0 – 1.0) */
   critChance(): number {
-    return Math.min(1.0, this.stats.luck * CFG_LUCK_CRIT_CHANCE);
+    return Math.min(1.0, this.stats.luck * C.player.luckCritChance);
   }
 
-  /** Crit damage multiplier: 1 + luck × CFG_LUCK_CRIT_MULT */
+  /** Crit damage multiplier */
   critMultiplier(): number {
-    return 1 + this.stats.luck * CFG_LUCK_CRIT_MULT;
+    return 1 + this.stats.luck * C.player.luckCritMult;
   }
 
   /** Hit chance against a given enemy agility — smooth curve with diminishing returns */
   hitChance(enemyAgility: number): number {
     const ratio = this.stats.dexterity / Math.max(1, enemyAgility);
-    // Exponential curve: approaches 1.0 asymptotically. k=1.5 gives ~78% at ratio=1, ~95% at ratio=2
-    return Math.min(1.0, Math.max(CFG_MIN_HIT_CHANCE, 1 - Math.exp(-1.5 * ratio)));
+    return Math.min(1.0, Math.max(C.player.minHitChance, 1 - Math.exp(-1.5 * ratio)));
   }
 
   /** Gold multiplier from Luck */
   goldMultiplier(): number {
-    return 1 + this.stats.luck * CFG_LUCK_GOLD_BONUS;
+    return 1 + this.stats.luck * C.player.luckGoldBonus;
   }
 
   /** Physical damage multiplier from Strength */
   strengthMult(): number {
-    return 1 + this.stats.strength * CFG_STRENGTH_DMG_BONUS;
+    return 1 + this.stats.strength * C.player.strengthDmgBonus;
   }
 
   /** Magic damage multiplier from Intelligence */
   intelligenceMult(): number {
-    return 1 + this.stats.intelligence * CFG_INTEL_MAGIC_BONUS;
+    return 1 + this.stats.intelligence * C.player.intelMagicBonus;
   }
 
   /** Fire rate multiplier from Agility */
   agilityFireRateMult(): number {
-    return 1 + this.stats.agility * CFG_AGILITY_FIRERATE;
+    return 1 + this.stats.agility * C.player.agilityFireRate;
   }
 
   // ─── Serialization ────────────────────────────────────────────────────────

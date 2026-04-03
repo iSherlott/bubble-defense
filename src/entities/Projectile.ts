@@ -1,5 +1,5 @@
 import type { ProjectileData, ElementType, DamageComponent } from '../types';
-import type { Enemy } from './Enemy';
+import type { BaseEnemy } from './BaseEnemy';
 
 let _nextProjId = 1;
 export function resetProjectileIds() { _nextProjId = 1; }
@@ -39,9 +39,9 @@ export function createProjectile(opts: {
 
 export function updateProjectile(
   proj: ProjectileData,
-  enemies: Enemy[],
+  enemies: BaseEnemy[],
   dt: number,
-): { hit: boolean; enemy: Enemy | null } {
+): { hit: boolean; enemy: BaseEnemy | null } {
   if (proj.dead) return { hit: false, enemy: null };
 
   const target = enemies.find(e => e.id === proj.targetEnemyId && !e.dead);

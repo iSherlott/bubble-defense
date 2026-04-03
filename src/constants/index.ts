@@ -1,46 +1,39 @@
 import type { TowerDef, EnemyDef, ElementType, Talent, FusionDef, ItemDef, ArchetypeDef } from '../types';
-import {
-  CFG_CELL_SIZE, CFG_SIDEBAR_W, CFG_WAVE_BAR_H,
-  CFG_MAP_TIERS,
-  CFG_BASE_LIVES, CFG_INITIAL_GOLD, CFG_BASE_TOWER_COST,
-  CFG_UPGRADE_MULT_STEP, CFG_MAX_TOWER_LEVEL, CFG_MAP_EXPAND_COST,
-  CFG_DUAL_MAGIC_BASE_CHANCE, CFG_DUAL_MAGIC_LUCK_BONUS,
-  CFG_MAX_LEVEL, CFG_TALENT_POINT_EVERY,
-  CFG_MIN_STAT_VALUE, CFG_STARTING_STAT_TOTAL,
-} from '../settings';
+import { GameConfig } from '../config';
+const C = GameConfig.get();
 
-// ─── Layout (from settings) ───────────────────────────────────────────────────
-export const CELL_SIZE  = CFG_CELL_SIZE;
-export const SIDEBAR_W  = CFG_SIDEBAR_W;
-export const WAVE_BAR_H = CFG_WAVE_BAR_H;
+// ─── Layout ───────────────────────────────────────────────────────────────────
+export const CELL_SIZE  = C.map.cellSize;
+export const SIDEBAR_W  = C.map.sidebarW;
+export const WAVE_BAR_H = C.map.waveBarH;
 
-// ─── Map Tiers (from settings) ────────────────────────────────────────────────
+// ─── Map Tiers ────────────────────────────────────────────────────────────────
 export interface MapTierDef {
   cols: number; rows: number;
   minSegH: number; maxSegH: number;
   maxSegV: number;
 }
-export const MAP_TIERS: MapTierDef[] = CFG_MAP_TIERS.map(t => ({ ...t }));
+export const MAP_TIERS: MapTierDef[] = C.map.tiers.map(t => ({ ...t }));
 export const MAP_TIER_AT = (wave: number) => Math.min(Math.floor(wave / 10), MAP_TIERS.length - 1);
 
-// ─── Economy (from settings) ──────────────────────────────────────────────────
-export const BASE_LIVES            = CFG_BASE_LIVES;
-export const INITIAL_GOLD          = CFG_INITIAL_GOLD;
-export const BASE_TOWER_COST       = CFG_BASE_TOWER_COST;
-export const UPGRADE_MULT_STEP     = CFG_UPGRADE_MULT_STEP;
-export const MAX_TOWER_LEVEL       = CFG_MAX_TOWER_LEVEL;
-export const MAP_EXPAND_COST       = CFG_MAP_EXPAND_COST;
-export const DUAL_MAGIC_BASE_CHANCE = CFG_DUAL_MAGIC_BASE_CHANCE;
-export const DUAL_MAGIC_LUCK_BONUS  = CFG_DUAL_MAGIC_LUCK_BONUS;
+// ─── Economy ──────────────────────────────────────────────────────────────────
+export const BASE_LIVES            = C.economy.baseLives;
+export const INITIAL_GOLD          = C.economy.initialGold;
+export const BASE_TOWER_COST       = C.economy.baseTowerCost;
+export const UPGRADE_MULT_STEP     = C.tower.upgradeMultStep;
+export const MAX_TOWER_LEVEL       = C.tower.maxLevel;
+export const MAP_EXPAND_COST       = C.map.expandCost;
+export const DUAL_MAGIC_BASE_CHANCE = C.tower.dualMagicBaseChance;
+export const DUAL_MAGIC_LUCK_BONUS  = C.tower.dualMagicLuckBonus;
 
-// ─── Leveling (from settings) ─────────────────────────────────────────────────
-export const XP_TABLE: number[] = Array.from({ length: CFG_MAX_LEVEL }, (_, i) =>
+// ─── Leveling ─────────────────────────────────────────────────────────────────
+export const XP_TABLE: number[] = Array.from({ length: C.player.maxLevel }, (_, i) =>
   Math.floor(5 + i * 9 + Math.pow(i, 1.85))
 );
-export const MAX_LEVEL          = CFG_MAX_LEVEL;
-export const TALENT_POINT_EVERY = CFG_TALENT_POINT_EVERY;
-export const MIN_STAT_VALUE     = CFG_MIN_STAT_VALUE;
-export const STARTING_STAT_TOTAL = CFG_STARTING_STAT_TOTAL;
+export const MAX_LEVEL          = C.player.maxLevel;
+export const TALENT_POINT_EVERY = C.player.talentPointEvery;
+export const MIN_STAT_VALUE     = C.player.minStatValue;
+export const STARTING_STAT_TOTAL = C.player.startingStatTotal;
 
 // ─── Element data ─────────────────────────────────────────────────────────────
 export const ELEMENT_COLORS: Record<ElementType, string> = {
