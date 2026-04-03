@@ -14,11 +14,14 @@ import {
   CFG_ENEMY_REWARD_SCALE, CFG_ENEMY_XP_SCALE,
   CFG_MOVE_COST_MULT, CFG_SYNERGY_DAMAGE_BONUS,
 } from '../settings';
-import { Tower, resetTowerIds } from '../entities/Tower';
-import { Enemy } from '../entities/Enemy';
+import { Tower, createTower, resetTowerIds } from '../entities/Tower';
+import type { BaseTower } from '../entities/BaseTower';
+import { createEnemy } from '../entities/Enemy';
+import type { BaseEnemy } from '../entities/BaseEnemy';
+import { BossEnemy } from '../entities/enemies/BossEnemy';
 import { createProjectile, updateProjectile, resetProjectileIds } from '../entities/Projectile';
 import { Player } from '../player/Player';
-import { TalentTree } from '../player/TalentTree';
+import { SkillTree as TalentTree } from '../player/SkillTree';
 import { WaveManager } from './WaveManager';
 import { generateMap, extendMap, positionOnPath } from './MapGenerator';
 import type { MapData } from './MapGenerator';
@@ -33,6 +36,10 @@ const WIND_PUSH_PX   = CFG_WIND_PUSH_CELLS * CELL_SIZE;
 
 interface FloatingText {
   x: number; y: number; text: string; color: string; life: number; maxLife: number;
+}
+
+interface BurnZone {
+  x: number; y: number; radius: number; remaining: number; dmgPerSec: number;
 }
 
 export interface UpgradePopup { col: number; row: number; }
@@ -53,10 +60,11 @@ export class Game {
   score  = 0;
 
   towers: Tower[] = [];
-  enemies: Enemy[] = [];
+  enemies: BaseEnemy[] = [];
   projectiles: ProjectileData[] = [];
   floatingTexts: FloatingText[] = [];
   puddles: Puddle[] = [];
+  burnZones: BurnZone[] = [];
 
   map: MapData;
 
@@ -75,7 +83,11 @@ export class Game {
   // Item system
   items: OwnedItem[] = [];
   itemDropAnim: ItemDropAnim | null = null;
-  private lastItemWave = 0;  // track which wave last gave item
+  private lastItemWave = 0;       // track which wave last gave item
+  private cataclysmTimer = 0;     // counts up; fires every 20s when Relicário owned
+  private titanShieldCharges = 0; // blocks next N life losses (Selo do Titã)
+  private titanShieldWaves = 0;   // wave count since last shield grant
+  private _lastTronoWave = 0;    // last wave that got Trono do Rei Goblin gold
 
   private lastTime = 0;
   private currentMapSeed = 1;
@@ -243,10 +255,10 @@ export class Game {
     if (back && this.hit(p, back)) { this.screen = 'game'; return; }
     for (const [id, r] of this.renderer.getTalentRects()) {
       if (this.hit(p, r)) {
-        const t = this.talentTree.talents.find(t => t.id === id);
-        if (t && this.talentTree.canPurchase(t, this.player.level, this.player.stats, this.player.talentPoints)) {
+        const node = this.talentTree.nodes.get(id);
+        if (node && this.talentTree.canPurchase(id, this.player.level, this.player.talentPoints)) {
           this.talentTree.purchase(id);
-          this.player.talentPoints -= t.cost;
+          this.player.talentPoints -= node.cost;
         }
         return;
       }
@@ -294,7 +306,7 @@ export class Game {
           const cost = this.towerCost(def.id) * 2;
           if (this.gold >= cost) {
             this.gold -= cost;
-            const t = new Tower(def, this.upgradePopup.col, this.upgradePopup.row, 1);
+            const t = createTower(def, this.upgradePopup.col, this.upgradePopup.row, 1);
             t.placedCost = cost;
             t.goldSpent  = cost;
             t.isSecondary = true;
@@ -405,7 +417,7 @@ export class Game {
     const cost = this.towerCost(def.id);
     if (this.gold < cost) return;
     this.gold -= cost;
-    const t = new Tower(def, col, row, slot);
+    const t = createTower(def, col, row, slot);
     t.placedCost = cost;
     t.goldSpent  = cost;
     this.towers.push(t);
@@ -456,8 +468,9 @@ export class Game {
   expandMap() {
     const nextTier = this.currentMapTier + 1;
     if (nextTier >= 4) return;  // already max tier
-    if (this.gold < MAP_EXPAND_COST) return;
-    this.gold -= MAP_EXPAND_COST;
+    const cost = Math.round(MAP_EXPAND_COST * (1 - this.getItemDiscount()));
+    if (this.gold < cost) return;
+    this.gold -= cost;
     this.doExpandMap(nextTier);
   }
 
@@ -538,11 +551,14 @@ export class Game {
     let pool: ItemDef[];
     if (roll < 0.05) {
       pool = ITEM_DEFS.filter(i => i.rarity === 'legendary');
-    } else if (roll < 0.25) {
+    } else if (roll < 0.18) {
+      pool = ITEM_DEFS.filter(i => i.rarity === 'epic');
+    } else if (roll < 0.40) {
       pool = ITEM_DEFS.filter(i => i.rarity === 'rare');
     } else {
       pool = ITEM_DEFS.filter(i => i.rarity === 'common');
     }
+    if (pool.length === 0) pool = ITEM_DEFS.filter(i => i.rarity === 'common');
     const item = pool[Math.floor(Math.random() * pool.length)];
     this.addItem(item);
   }
@@ -571,15 +587,15 @@ export class Game {
     this.itemDropAnim = { item, phase: 'rising', timer: 0, totalTime: 2.5 };
   }
 
-  /** Total bonus gold per kill from items (diminishing per stack: ×1, ×0.8, ×0.6) */
+  /** Total bonus gold per kill from items */
   getItemGoldBonus(): number {
     let bonus = 0;
-    const stackMult = [1.0, 0.8, 0.6];
     for (const owned of this.items) {
       const def = ITEM_DEFS.find(d => d.id === owned.defId);
-      if (def && def.effectType === 'gold_mult') {
-        for (let s = 0; s < owned.stacks; s++) bonus += def.effectValue * (stackMult[s] ?? 0.6);
-      }
+      if (!def) continue;
+      if (def.effectType === 'gold_mult') bonus += def.effectValue * owned.stacks;
+      // Trono do Rei Goblin: +2 gold per kill per stack
+      if (def.effectType === 'wave_gold_bonus') bonus += 2 * owned.stacks;
     }
     return Math.round(bonus);
   }
@@ -603,6 +619,137 @@ export class Game {
     }
     return slow;
   }
+
+  /** Returns true if the player owns at least one stack of the given item */
+  private hasItem(id: string): boolean {
+    return this.items.some(i => i.defId === id);
+  }
+
+  /** Total stacks of the given item */
+  private itemStacks(id: string): number {
+    return this.items.find(i => i.defId === id)?.stacks ?? 0;
+  }
+
+  // ── Per-element tower bonuses ──────────────────────────────────────────────
+
+  /** Extra damage multiplier bonus for element (Brasa/Coroa das Quatro Marés) */
+  getItemDmgBonus(element: ElementType): number {
+    let bonus = 0;
+    // Brasa do Vigia: +8% fire tower damage per stack
+    if (element === 'fire') {
+      const s = this.itemStacks('ember_sentry');
+      if (s > 0) bonus += 0.08 * s;
+    }
+    // Coroa das Quatro Marés: +12% all towers
+    const crownStacks = this.itemStacks('four_tides_crown');
+    if (crownStacks > 0) bonus += 0.12 * crownStacks;
+    return bonus;
+  }
+
+  /** Extra fire-rate multiplier bonus for element (Gota de Maré/Coroa) */
+  getItemSpeedBonus(element: ElementType): number {
+    let bonus = 0;
+    // Gota de Maré: +10% water tower fire rate per stack
+    if (element === 'water') {
+      const s = this.itemStacks('tide_drop');
+      if (s > 0) bonus += 0.10 * s;
+    }
+    // Coroa das Quatro Marés: +12% all towers
+    const crownStacks = this.itemStacks('four_tides_crown');
+    if (crownStacks > 0) bonus += 0.12 * crownStacks;
+    return bonus;
+  }
+
+  /** Extra range multiplier for element (Seixo Rúnico) — returns a mult (1 + bonus) */
+  getItemRangeMult(element: ElementType): number {
+    let bonus = 0;
+    if (element === 'earth') {
+      const s = this.itemStacks('runic_pebble');
+      if (s > 0) bonus += 0.12 * s;
+    }
+    return 1 + bonus;
+  }
+
+  /** Extra magic bar gain bonus for element (Ampulheta Vulcânica/Coroa) */
+  getItemMagicChargeBonus(element: ElementType): number {
+    let bonus = 0;
+    if (element === 'fire') {
+      const s = this.itemStacks('volcanic_hourglass');
+      if (s > 0) bonus += 0.20 * s;
+    }
+    // Coroa das Quatro Marés: +15% all magic charge
+    const crownStacks = this.itemStacks('four_tides_crown');
+    if (crownStacks > 0) bonus += 0.15 * crownStacks;
+    return bonus;
+  }
+
+  /** Extra pixels pushed by wind magic (Insígnia do Vendaval) */
+  getItemWindPushBonus(): number {
+    const s = this.itemStacks('gale_insignia');
+    return s > 0 ? s * CELL_SIZE : 0;
+  }
+
+  /** Wind stun duration multiplier (Pena de Corrente) */
+  getItemWindStunMult(): number {
+    const s = this.itemStacks('wind_feather');
+    return 1 + (s > 0 ? 0.15 * s : 0);
+  }
+
+  /** Water slow strength multiplier (Medalhão da Maré Profunda) */
+  getItemWaterSlowAmp(): number {
+    const s = this.itemStacks('deep_tide_medal');
+    return 1 + (s > 0 ? 0.25 * s : 0);
+  }
+
+  /** Earth AoE radius multiplier from item (Totem da Falha Sísmica) */
+  getItemEarthRadiusBonus(): number {
+    const s = this.itemStacks('seismic_totem');
+    return s > 0 ? 0.20 * s : 0;
+  }
+
+  /** Gold bonus given at each wave start (Trono do Rei Goblin: +40 gold) */
+  private getItemWaveStartGold(): number {
+    let bonus = 0;
+    for (const owned of this.items) {
+      const def = ITEM_DEFS.find(d => d.id === owned.defId);
+      if (def && def.effectType === 'wave_gold_bonus') bonus += def.effectValue * owned.stacks;
+    }
+    return Math.round(bonus);
+  }
+
+  /** Damage multiplier for hunter bonus vs elites/golems/bosses */
+  getItemHunterMult(enemy: BaseEnemy): number {
+    const s = this.itemStacks('golem_hunter');
+    if (s === 0) return 1;
+    const isTarget = (enemy as any)._elite || enemy.def.isBoss || enemy.def.golemType != null;
+    return isTarget ? 1 + 0.18 * s : 1;
+  }
+
+  /** Damage multiplier for boss/high-HP bonus (Núcleo do Titã) */
+  getItemBossMult(enemy: BaseEnemy): number {
+    const s = this.itemStacks('shadow_core');
+    if (s === 0) return 1;
+    const isTarget = enemy.def.isBoss || (enemy.hp / enemy.maxHp > 0.70);
+    return isTarget ? 1 + 0.30 * s : 1;
+  }
+
+  /** True if Coração de Magma is owned (fire magic leaves burn zone) */
+  hasFireMagmaTrail(): boolean { return this.hasItem('magma_heart'); }
+
+  /** True if Coroa da Nevasca is owned (water magic freeze chance) */
+  hasWaterFreeze(): boolean { return this.hasItem('blizzard_crown'); }
+  waterFreezeChance(): number { return 0.20 * this.itemStacks('blizzard_crown'); }
+
+  /** True if Olho da Tempestade is owned (earth magic sandstorm) */
+  hasEarthSandstorm(): boolean { return this.hasItem('sandstorm_eye'); }
+
+  /** True if Trombeta do Furacão is owned (wind magic hits 3 aligned) */
+  hasWindChainMagic(): boolean { return this.hasItem('hurricane_horn'); }
+  windChainDmgMult(): number { return 1 + 0.30 * this.itemStacks('hurricane_horn'); }
+
+  /** True if Asa do Dragão Caótico is owned (fire AoE splash) */
+  hasFireAoeSplash(): boolean { return this.hasItem('chaos_wing'); }
+  fireAoeSplashMult(): number { return 0.25 * this.itemStacks('chaos_wing'); }
 
   /**
    * Tiered synergy bonus based on minimum tower level on the cell:
@@ -635,8 +782,9 @@ export class Game {
   private initState() {
     this.gold  = INITIAL_GOLD; this.lives = BASE_LIVES; this.score = 0;
     this.towers = []; this.enemies = []; this.projectiles = [];
-    this.floatingTexts = []; this.puddles = [];
+    this.floatingTexts = []; this.puddles = []; this.burnZones = [];
     this.items = []; this.itemDropAnim = null; this.lastItemWave = 0;
+    this.cataclysmTimer = 0; this.titanShieldCharges = 0; this.titanShieldWaves = 0; this._lastTronoWave = 0;
     this.talentTree  = new TalentTree();
     this.waveManager = new WaveManager();
     this.upgradePopup = null; this.paused = false; this.autoWave = false;
@@ -674,7 +822,7 @@ export class Game {
     for (const t of data.game.towers) {
       const def = TOWER_DEFS.find(d => d.id === t.typeId);
       if (!def) continue;
-      const tower = new Tower(def, t.gridX, t.gridY, t.slotIndex as 0|1);
+      const tower = createTower(def, t.gridX, t.gridY, t.slotIndex as 0|1);
       tower.damageMult    = t.damageMult;
       tower.speedMult     = t.speedMult;
       tower.dualMagic     = t.dualMagic;
@@ -740,7 +888,7 @@ export class Game {
   private update(dt: number) {
     const { waypoints, totalLength, pathCells, gameWidth, gameHeight } = this.map;
 
-    // Wave just completed → vitality life regen + item drop every 10 waves
+    // Wave just completed → vitality regen + item drop every 10 waves + titan shield
     if (this.waveManager.waveComplete) {
       this.waveManager.waveComplete = false;  // consume the flag
       const regen = this.player.vitalityRegen();
@@ -754,11 +902,30 @@ export class Game {
         this.lastItemWave = completedWave;
         this.rollItemDrop();
       }
+      // Titan shield (Selo do Titã Sombrio): grant 1 shield charge every 3 waves
+      const titanStacks = this.itemStacks('titan_seal');
+      if (titanStacks > 0) {
+        this.titanShieldWaves++;
+        if (this.titanShieldWaves >= 3) {
+          this.titanShieldWaves = 0;
+          this.titanShieldCharges += titanStacks;
+          this.addFT({ x: this.map.gameWidth / 2, y: this.map.gameHeight / 2 - 30 }, `🛡 Escudo do Titã!`, '#cc44ff');
+        }
+      }
     }
 
     // Auto-start wave
     if (this.autoWave && this.waveManager.betweenWaves && !this.waveManager.waveActive) {
       this.waveManager.startWave();
+    }
+    // Trono do Rei Goblin: +40g per stack at the start of every new wave
+    if (this.waveManager.waveActive && this.waveManager.currentWave !== this._lastTronoWave) {
+      this._lastTronoWave = this.waveManager.currentWave;
+      const waveGold = this.getItemWaveStartGold();
+      if (waveGold > 0) {
+        this.gold += waveGold;
+        this.addFT({ x: this.map.gameWidth / 2, y: this.map.gameHeight / 2 }, `👑 +${waveGold}g`, '#ffdd44');
+      }
     }
 
     // Auto map tier upgrade every 10 waves (preserves existing path)
@@ -780,9 +947,18 @@ export class Game {
     for (const e of this.enemies) {
       if (e.reachedEnd && !e.dead) {
         e.dead = true;
-        const lost = e.def.baseLivesLost;
-        this.lives = Math.max(0, this.lives - lost);
-        if (lost > 0) this.addFT(e.pos, `-${lost}❤`, '#ff4444');
+        let lost = e.def.baseLivesLost;
+        // Titan shield absorbs life losses
+        if (lost > 0 && this.titanShieldCharges > 0) {
+          const absorbed = Math.min(lost, this.titanShieldCharges);
+          this.titanShieldCharges -= absorbed;
+          lost -= absorbed;
+          this.addFT(e.pos, `🛡 Bloqueado!`, '#cc44ff');
+        }
+        if (lost > 0) {
+          this.lives = Math.max(0, this.lives - lost);
+          this.addFT(e.pos, `-${lost}❤`, '#ff4444');
+        }
         if (this.lives <= 0) { this.screen = 'gameover'; return; }
       }
     }
@@ -803,6 +979,28 @@ export class Game {
     for (const pu of this.puddles) pu.remaining -= dt;
     this.puddles = this.puddles.filter(p => p.remaining > 0);
 
+    // Burn zones (Coração de Magma)
+    for (const bz of this.burnZones) {
+      bz.remaining -= dt;
+      for (const e of this.enemies) {
+        if (e.dead) continue;
+        if (Math.hypot(e.pos.x - bz.x, e.pos.y - bz.y) <= bz.radius) {
+          const dmg = bz.dmgPerSec * dt;
+          e.receiveDamage(dmg, 'fire');
+        }
+      }
+    }
+    this.burnZones = this.burnZones.filter(bz => bz.remaining > 0);
+
+    // Cataclysm (Relicário do Cataclismo Elemental) — every 20s
+    if (this.hasItem('cataclysm_relic') && this.waveManager.waveActive) {
+      this.cataclysmTimer += dt;
+      if (this.cataclysmTimer >= 20) {
+        this.cataclysmTimer = 0;
+        this.fireCataclysm();
+      }
+    }
+
     // Boss abilities
     this.processBossAbilities(dt);
 
@@ -814,13 +1012,18 @@ export class Game {
       const magicSpB = this.talentTree.magicSpeedBonusForElement(tower.def.element);
       const affM     = tower.computeAffinityMult(this.player.affinity);
 
-      if (!tower.canShoot(this.player.stats, speedB)) continue;
-      const target = tower.findTarget(this.enemies);
+      const itemSpeedB = this.getItemSpeedBonus(tower.def.element);
+      const itemRangeMult = this.getItemRangeMult(tower.def.element);
+      const itemMagicChB  = this.getItemMagicChargeBonus(tower.def.element);
+
+      if (!tower.canShoot()) continue;
+      const target = tower.findTarget(this.enemies, itemRangeMult);
       if (!target) continue;
 
       const dmgB     = this.talentTree.damageBonusForElement(tower.def.element);
       const synergy  = this.getSynergyBonus(tower);
-      const baseDmg  = tower.getDamage(this.player.stats, dmgB + synergy, affM);
+      const itemDmgB = this.getItemDmgBonus(tower.def.element);
+      const baseDmg  = tower.getDamage(this.player.stats, dmgB + synergy + itemDmgB, affM);
 
       const didHit   = Math.random() <= this.player.hitChance(target.agility);
       const isCrit   = didHit && Math.random() < this.player.critChance();
@@ -841,7 +1044,7 @@ export class Game {
         components: fusionComponents,
       }));
 
-      const magicReady = tower.onNormalShot(this.player.stats, speedB, magicSpB);
+      const magicReady = tower.onNormalShot(this.player.stats, speedB + itemSpeedB, magicSpB + itemMagicChB);
       if (magicReady) {
         tower.consumeMagicBar();
         this.fireMagic(tower, affM, extraProjs);
@@ -1059,6 +1262,70 @@ export class Game {
         }
         break;
       }
+      case 'solar_core': {
+        // Fire+Fire: massive AoE fire burst + eternal burn on all enemies in range
+        for (const t of targets) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: 'fire',
+            color: fusion.color, isMagic: true, burnFromMagic: true,
+          }));
+        }
+        // Leave persistent burn zone
+        this.burnZones.push({ x: primary.pos.x, y: primary.pos.y, radius: tower.getRange() * 0.5, remaining: 6, dmgPerSec: baseDmg * 0.15 });
+        this.renderer.triggerAoe(primary.pos.x, primary.pos.y, tower.getRange() * 0.7);
+        break;
+      }
+      case 'abyssal_vortex': {
+        // Water+Water: AoE slow + stun pulse; add 3 permanent slows to each
+        for (const t of targets) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: 'water',
+            color: fusion.color, isMagic: true,
+          }));
+          t.addPermanentSlow(); t.addPermanentSlow(); t.addPermanentSlow();
+          t.stunRemaining = Math.max(t.stunRemaining, 1.0);
+        }
+        this.puddles.push({ x: primary.pos.x, y: primary.pos.y, radius: tower.getRange() * 0.6, remaining: 10, slowAmount: 0.15 });
+        this.renderer.triggerAoe(primary.pos.x, primary.pos.y, tower.getRange() * 0.6);
+        break;
+      }
+      case 'primal_quake': {
+        // Earth+Earth: screen-wide tremor — hit ALL enemies currently on map
+        const allEnemies = this.enemies.filter(e => !e.dead && !e.reachedEnd);
+        for (const t of allEnemies) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg * 0.6, element: 'earth',
+            color: fusion.color, isMagic: true,
+          }));
+          t.stunRemaining = Math.max(t.stunRemaining, 0.5);
+        }
+        this.renderer.triggerAoe(this.map.gameWidth / 2, this.map.gameHeight / 2, Math.max(this.map.gameWidth, this.map.gameHeight));
+        this.addFT({ x: this.map.gameWidth / 2, y: this.map.gameHeight / 2 }, `☀ TERREMOTO PRIMORDIAL!`, fusion.color);
+        break;
+      }
+      case 'eternal_hurricane': {
+        // Wind+Wind: hit enemies within 1.5× range, push 3 tiles back (not to start), stun
+        const extRange = 1.5;
+        const hurricaneTargets = tower.findAllInRange(this.enemies, extRange);
+        const pushPx = WIND_PUSH_PX * 3;
+        for (const t of hurricaneTargets) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: 'wind',
+            color: fusion.color, isMagic: true,
+          }));
+          if (t.def.golemType !== 'wind') {
+            // Push back 3 tiles but keep at least 1 cell from path origin
+            t.distanceTraveled = Math.max(CELL_SIZE, t.distanceTraveled - pushPx);
+            t.stunRemaining = Math.max(t.stunRemaining, 1.5);
+          }
+        }
+        this.renderer.triggerAoe(tower.pixelX, tower.pixelY, tower.getRange(extRange));
+        break;
+      }
       default: {
         // Fallback: single target
         extra.push(createProjectile({
@@ -1078,20 +1345,16 @@ export class Game {
     for (const e of this.enemies) {
       if (e.dead || !e.def.isBoss || !e.def.bossAbility) continue;
 
+      if (!(e instanceof BossEnemy)) continue;
+
       switch (e.def.bossAbility) {
         case 'summon_adds': {
           // Goblin King: spawns 2 goblins at each 25% HP threshold (75%, 50%, 25%)
-          const thresholds = [0.75, 0.50, 0.25];
-          const hpFrac = e.hp / e.maxHp;
-          let shouldSpawn = 0;
-          for (const t of thresholds) {
-            if (hpFrac <= t) shouldSpawn++;
-          }
-          while (e.bossAddsSpawned < shouldSpawn) {
-            e.bossAddsSpawned++;
+          const spawnTrigger = e.checkAddSpawn();
+          if (spawnTrigger > 0) {
             const goblinDef = ENEMY_DEFS.find(d => d.id === 'goblin')!;
             for (let i = 0; i < 2; i++) {
-              const add = new Enemy(goblinDef, this.waveManager.currentWave, 1);
+              const add = createEnemy(goblinDef, this.waveManager.currentWave, 1);
               add.distanceTraveled = Math.max(0, e.distanceTraveled - 30 - i * 20);
               add.pos = { ...e.pos };
               this.enemies.push(add);
@@ -1102,27 +1365,21 @@ export class Game {
           break;
         }
         case 'fire_trail': {
-          // Chaos Dragon: leaves burn puddles every ~2s (tracked via cooldown hack on stunRemaining)
-          // We reuse a simple timer approach
           if (!('_trailTimer' in e)) (e as any)._trailTimer = 0;
           (e as any)._trailTimer -= dt;
           if ((e as any)._trailTimer <= 0) {
             (e as any)._trailTimer = 2.0;
-            // Create a fire puddle (burns nearby enemies — acts as a danger zone)
             this.puddles.push({
               x: e.pos.x, y: e.pos.y, radius: 35,
-              remaining: 6, slowAmount: -0.10,  // negative = speed up (fire urgency), but we use it as indicator
+              remaining: 6, slowAmount: -0.10,
             });
             this.addFT(e.pos, '🔥 Rastro!', '#ff4400');
           }
           break;
         }
         case 'shield_phase': {
-          // Shadow Titan: becomes immune for 3s when first reaching 50% HP
-          if (!e.bossShieldTriggered && e.hp <= e.maxHp * 0.5) {
-            e.bossShieldTriggered = true;
-            e.bossShieldActive = true;
-            e.bossShieldTimer = 3.0;
+          // Uses BossEnemy.tryTriggerShield() — idol check + shield state managed in subclass
+          if (e.tryTriggerShield()) {
             this.addFT(e.pos, '🛡 ESCUDO ATIVO!', '#aa44ff');
           }
           break;
@@ -1133,14 +1390,14 @@ export class Game {
 
   // ─── Hit Resolution ──────────────────────────────────────────────────────────
   /** Returns earth golem within 80px of enemy that can absorb damage, or null */
-  private findEarthGolemShield(enemy: Enemy): Enemy | null {
+  private findEarthGolemShield(enemy: BaseEnemy): BaseEnemy | null {
     return this.enemies.find(e =>
       !e.dead && e !== enemy && e.def.golemType === 'earth' &&
       Math.hypot(e.pos.x - enemy.pos.x, e.pos.y - enemy.pos.y) <= CFG_EARTH_GOLEM_SHIELD_RADIUS
     ) ?? null;
   }
 
-  private onHit(proj: ProjectileData, enemy: Enemy, extra: ProjectileData[]) {
+  private onHit(proj: ProjectileData, enemy: BaseEnemy, extra: ProjectileData[]) {
     if (proj.isMiss) { this.addFT(enemy.pos, 'MISS', '#666666'); return; }
     if (proj.isMagic) { this.applyMagic(proj, enemy); return; }
 
@@ -1149,12 +1406,17 @@ export class Game {
     const actualTarget = shield ?? enemy;
     const tw = this.towers.find(t => t.id === proj.towerId);
 
+    // Item damage multipliers
+    const hunterMult = this.getItemHunterMult(actualTarget);
+    const bossMult   = this.getItemBossMult(actualTarget);
+    const itemMult   = hunterMult * bossMult;
+
     if (proj.components && proj.components.length > 0) {
       // Multi-element damage: apply each component separately
       let totalDealt = 0;
       const parts: string[] = [];
       for (const comp of proj.components) {
-        const d = actualTarget.receiveDamage(comp.amount, comp.element);
+        const d = actualTarget.receiveDamage(comp.amount * itemMult, comp.element);
         totalDealt += d;
         if (d > 0) parts.push(`${Math.round(d)}${ELEMENT_COLORS[comp.element] === proj.color ? '' : comp.element[0]}`);
       }
@@ -1163,25 +1425,51 @@ export class Game {
       if (shield) this.addFT(shield.pos, `🛡${label}`, '#aaaaff');
       else this.addFT(enemy.pos, proj.isCrit ? `${label} CRÍTICO!` : label,
         proj.isCrit ? '#ffff44' : proj.color);
+      // Fire AoE splash (Asa do Dragão Caótico)
+      if (this.hasFireAoeSplash() && proj.components.some(c => c.element === 'fire')) {
+        this.applyFireAoeSplash(actualTarget, totalDealt * this.fireAoeSplashMult());
+      }
     } else {
       // Single-element damage (original path)
-      const dmg = actualTarget.receiveDamage(proj.damage, proj.element);
+      const dmg = actualTarget.receiveDamage(proj.damage * itemMult, proj.element);
       if (tw) { tw.totalDamageDealt += dmg; if (actualTarget.dead) tw.totalKills++; }
-      if (shield) this.addFT(shield.pos, `🛡${Math.round(dmg)}`, '#aaaaff');
-      else this.addFT(enemy.pos, proj.isCrit ? `${Math.round(dmg)} CRÍTICO!` : String(Math.round(dmg)),
-        proj.isCrit ? '#ffff44' : proj.color);
+      if (shield) {
+        this.addFT(shield.pos, `🛡${Math.round(dmg)}`, '#aaaaff');
+      } else if (dmg === 0 && proj.element === 'fire' && actualTarget.def.golemType === 'fire') {
+        this.addFT(enemy.pos, '🔥IMUNE', '#ff6600');
+      } else {
+        this.addFT(enemy.pos, proj.isCrit ? `${Math.round(dmg)} CRÍTICO!` : String(Math.round(dmg)),
+          proj.isCrit ? '#ffff44' : proj.color);
+      }
+      // Fire AoE splash (Asa do Dragão Caótico)
+      if (this.hasFireAoeSplash() && proj.element === 'fire') {
+        this.applyFireAoeSplash(actualTarget, dmg * this.fireAoeSplashMult());
+      }
     }
   }
 
-  private applyMagic(proj: ProjectileData, target: Enemy) {
+  /** Splash 25% of fire damage to adjacent enemies (Asa do Dragão Caótico) */
+  private applyFireAoeSplash(source: BaseEnemy, splashDmg: number) {
+    if (splashDmg <= 0) return;
+    const splashRadius = 60;
+    for (const e of this.enemies) {
+      if (e === source || e.dead) continue;
+      if (Math.hypot(e.pos.x - source.pos.x, e.pos.y - source.pos.y) <= splashRadius) {
+        e.receiveDamage(splashDmg, 'fire');
+      }
+    }
+  }
+
+  private applyMagic(proj: ProjectileData, target: BaseEnemy) {
     const tw = this.towers.find(t => t.id === proj.towerId);
 
     // Multi-element magic: resolve each component, then apply effects from primary element
     if (proj.components && proj.components.length > 0) {
+      const itemMult = this.getItemHunterMult(target) * this.getItemBossMult(target);
       let totalDealt = 0;
       const parts: string[] = [];
       for (const comp of proj.components) {
-        const d = target.receiveDamage(comp.amount, comp.element);
+        const d = target.receiveDamage(comp.amount * itemMult, comp.element);
         totalDealt += d;
         if (d > 0) parts.push(`${Math.round(d)}${ELEMENT_ICONS[comp.element]}`);
       }
@@ -1192,14 +1480,25 @@ export class Game {
       if (elements.includes('fire') && proj.burnFromMagic) {
         target.applyBurn(CFG_BURN_PCT_PER_SEC, CFG_BURN_DURATION);
       }
+      if (elements.includes('fire') && this.hasFireMagmaTrail()) {
+        this.burnZones.push({ x: target.pos.x, y: target.pos.y, radius: 50, remaining: 4, dmgPerSec: proj.damage * 0.20 });
+      }
+      if (elements.includes('fire') && this.hasFireAoeSplash()) {
+        this.applyFireAoeSplash(target, totalDealt * this.fireAoeSplashMult());
+      }
       if (elements.includes('water')) {
-        target.addPermanentSlow();
+        const slowAmp = Math.round(this.getItemWaterSlowAmp());
+        for (let i = 0; i < slowAmp; i++) target.addPermanentSlow();
         if (Math.random() < this.talentTree.waterPuddleChance()) {
           this.puddles.push({ x: target.pos.x, y: target.pos.y, radius: PUDDLE_RADIUS, remaining: PUDDLE_DURATION, slowAmount: CFG_PUDDLE_SLOW_AMOUNT });
         }
+        if (this.hasWaterFreeze() && Math.random() < this.waterFreezeChance()) {
+          target.stunRemaining = Math.max(target.stunRemaining, 1.2);
+        }
       }
       if (elements.includes('wind') && target.def.golemType !== 'wind') {
-        target.distanceTraveled = Math.max(0, target.distanceTraveled - WIND_PUSH_PX * 0.5);
+        const windPushPx = WIND_PUSH_PX * 0.5 + this.getItemWindPushBonus() * 0.5;
+        target.distanceTraveled = Math.max(0, target.distanceTraveled - windPushPx);
       }
       // Earth AoE is handled at the fusion level (fireFusionMagic already does AoE targeting)
 
@@ -1210,48 +1509,138 @@ export class Game {
     // Single-element magic (original path)
     const c  = ELEMENT_COLORS[proj.element];
 
+    // Item damage multipliers for magic
+    const hunterMult = this.getItemHunterMult(target);
+    const bossMult   = this.getItemBossMult(target);
+    const itemMult   = hunterMult * bossMult;
+
     switch (proj.element) {
       case 'fire': {
-        const d = target.receiveDamage(proj.damage, 'fire');
+        if (target.def.golemType === 'fire') {
+          this.addFT(target.pos, '🔥IMUNE', '#ff6600');
+          break;
+        }
+        const d = target.receiveDamage(proj.damage * itemMult, 'fire');
         if (tw) { tw.totalDamageDealt += d; if (target.dead) tw.totalKills++; }
         if (proj.burnFromMagic) target.applyBurn(CFG_BURN_PCT_PER_SEC, CFG_BURN_DURATION);
         this.addFT(target.pos, `✨${Math.round(d)}`, c);
+        // Coração de Magma: leave burn zone
+        if (this.hasFireMagmaTrail()) {
+          this.burnZones.push({ x: target.pos.x, y: target.pos.y, radius: 50, remaining: 4, dmgPerSec: proj.damage * 0.20 });
+        }
+        // Asa do Dragão Caótico: fire AoE splash
+        if (this.hasFireAoeSplash()) this.applyFireAoeSplash(target, d * this.fireAoeSplashMult());
         break;
       }
       case 'water': {
-        const d = target.receiveDamage(proj.damage, 'water');
+        const d = target.receiveDamage(proj.damage * itemMult, 'water');
         if (tw) { tw.totalDamageDealt += d; if (target.dead) tw.totalKills++; }
-        target.addPermanentSlow();
-        this.addFT(target.pos, `💧-5%vel(${target.permanentSlowStacks})`, '#66aaff');
+        // Medalhão da Maré Profunda: amplify slow stacks
+        const slowAmp = this.getItemWaterSlowAmp();
+        const slowStacks = Math.round(slowAmp);
+        for (let i = 0; i < slowStacks; i++) target.addPermanentSlow();
+        this.addFT(target.pos, `💧-5%vel×${slowStacks}(${target.permanentSlowStacks})`, '#66aaff');
         if (Math.random() < this.talentTree.waterPuddleChance()) {
           this.puddles.push({ x: target.pos.x, y: target.pos.y, radius: PUDDLE_RADIUS, remaining: PUDDLE_DURATION, slowAmount: CFG_PUDDLE_SLOW_AMOUNT });
+        }
+        // Coroa da Nevasca: freeze chance
+        if (this.hasWaterFreeze() && Math.random() < this.waterFreezeChance()) {
+          target.stunRemaining = Math.max(target.stunRemaining, 1.2);
+          this.addFT(target.pos, `❄ CONGELADO!`, '#aaeeff');
         }
         break;
       }
       case 'earth': {
-        const aoeR = EARTH_AOE_BASE * this.talentTree.earthAoERadiusMult();
+        const aoeR = EARTH_AOE_BASE * this.talentTree.earthAoERadiusMult() * (1 + this.getItemEarthRadiusBonus());
         const targets = this.enemies.filter(e => !e.dead && Math.hypot(e.pos.x - target.pos.x, e.pos.y - target.pos.y) <= aoeR);
         for (const t of targets) {
-          const d = t.receiveDamage(proj.damage, 'earth');
+          const tMult = this.getItemHunterMult(t) * this.getItemBossMult(t);
+          const d = t.receiveDamage(proj.damage * tMult, 'earth');
           if (tw) { tw.totalDamageDealt += d; if (t.dead) tw.totalKills++; }
           this.addFT(t.pos, `🌍${Math.round(d)}`, c);
+          // Olho da Tempestade de Areia: slow + accuracy penalty
+          if (this.hasEarthSandstorm()) {
+            t.applyTempSlow(0.20, 5);
+            (t as any)._sandstormAcc = { amount: 0.15, remaining: 5 };
+          }
         }
         this.renderer.triggerAoe(target.pos.x, target.pos.y, aoeR);
         break;
       }
       case 'wind': {
-        const d = target.receiveDamage(proj.damage, 'wind');
-        if (tw) { tw.totalDamageDealt += d; if (target.dead) tw.totalKills++; }
-        if (target.def.golemType !== 'wind') {  // wind golems are immune to push
-          target.distanceTraveled = Math.max(0, target.distanceTraveled - WIND_PUSH_PX);
-          if (this.talentTree.windStunDuration() > 0) target.stunRemaining = this.talentTree.windStunDuration();
-          this.addFT(target.pos, `💨-3tiles`, '#ccee44');
-        } else {
-          this.addFT(target.pos, `💨IMUNE`, '#ccee44');
+        // Trombeta do Furacão: hit up to 3 aligned enemies
+        const windTargets = this.hasWindChainMagic()
+          ? this.findWindChainTargets(target, 3)
+          : [target];
+        const windDmgMult = this.hasWindChainMagic() ? this.windChainDmgMult() : 1;
+        const windPushPx  = WIND_PUSH_PX + this.getItemWindPushBonus();
+        const windStunDur = this.talentTree.windStunDuration() * this.getItemWindStunMult();
+
+        for (const wt of windTargets) {
+          const wtMult = this.getItemHunterMult(wt) * this.getItemBossMult(wt);
+          const d = wt.receiveDamage(proj.damage * windDmgMult * wtMult, 'wind');
+          if (tw) { tw.totalDamageDealt += d; if (wt.dead) tw.totalKills++; }
+          if (wt.def.golemType !== 'wind') {
+            wt.distanceTraveled = Math.max(0, wt.distanceTraveled - windPushPx);
+            if (windStunDur > 0) wt.stunRemaining = Math.max(wt.stunRemaining, windStunDur);
+            this.addFT(wt.pos, `💨-${Math.round(windPushPx / CELL_SIZE)}tiles`, '#ccee44');
+          } else {
+            this.addFT(wt.pos, `💨IMUNE`, '#ccee44');
+          }
         }
         break;
       }
     }
+  }
+
+  /** Global explosion (Relicário do Cataclismo Elemental): 250% magic damage of strongest tower */
+  private fireCataclysm() {
+    if (this.enemies.length === 0) return;
+    // Find tower with highest magicBaseDamage
+    const strongest = this.towers.reduce<Tower | null>((best, t) => {
+      if (!best) return t;
+      const affM = t.computeAffinityMult(this.player.affinity);
+      const bestAffM = best.computeAffinityMult(this.player.affinity);
+      return t.getMagicDamage(this.player.stats, affM) > best.getMagicDamage(this.player.stats, bestAffM) ? t : best;
+    }, null);
+    if (!strongest) return;
+
+    const catStacks = this.itemStacks('cataclysm_relic');
+    const affM = strongest.computeAffinityMult(this.player.affinity);
+    const baseMagic = strongest.getMagicDamage(this.player.stats, affM);
+    const catDmg = baseMagic * 2.50 * catStacks;
+
+    let hitCount = 0;
+    for (const e of this.enemies) {
+      if (!e.dead && !e.reachedEnd) {
+        e.receiveDamage(catDmg, strongest.def.element);
+        hitCount++;
+      }
+    }
+    this.renderer.triggerAoe(this.map.gameWidth / 2, this.map.gameHeight / 2, Math.max(this.map.gameWidth, this.map.gameHeight));
+    this.addFT({ x: this.map.gameWidth / 2, y: this.map.gameHeight / 2 }, `💥 CATACLISMO! ×${hitCount}`, '#ff6600');
+  }
+
+  /** Find up to N enemies aligned (within cone) with the primary wind target */
+  private findWindChainTargets(primary: BaseEnemy, maxCount: number): BaseEnemy[] {
+    const results: BaseEnemy[] = [primary];
+    const towerRange = 200; // approximate
+    // Sort all live enemies by proximity to primary along wind direction
+    const others = this.enemies
+      .filter(e => !e.dead && e !== primary && !e.reachedEnd)
+      .sort((a, b) => {
+        // Prefer enemies near the same Y-coordinate (path direction approximation)
+        const da = Math.abs(a.pos.y - primary.pos.y) + Math.abs(a.pos.x - primary.pos.x) * 0.3;
+        const db = Math.abs(b.pos.y - primary.pos.y) + Math.abs(b.pos.x - primary.pos.x) * 0.3;
+        return da - db;
+      });
+    for (const e of others) {
+      if (results.length >= maxCount) break;
+      if (Math.hypot(e.pos.x - primary.pos.x, e.pos.y - primary.pos.y) <= towerRange) {
+        results.push(e);
+      }
+    }
+    return results;
   }
 
   private addFT(pos: Vec2, text: string, color: string) {
@@ -1263,6 +1652,7 @@ export class Game {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   private render() {
+    this.renderer.setMousePos(this.mousePos);
     this.renderer.render({
       screen: this.screen,
       paused: this.paused,
@@ -1293,6 +1683,7 @@ export class Game {
       gameSpeed: this.gameSpeed,
       debugMode: this.debugMode,
       pendingAffinity: this.pendingAffinity,
+      mousePos: this.mousePos,
     });
   }
 

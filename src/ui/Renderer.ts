@@ -1,8 +1,8 @@
 import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, Stats } from '../types';
-import type { Tower } from '../entities/Tower';
-import type { Enemy } from '../entities/Enemy';
+import type { BaseTower as Tower } from '../entities/BaseTower';
+import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
 import type { Player } from '../player/Player';
-import type { TalentTree } from '../player/TalentTree';
+import type { SkillTree as TalentTree } from '../player/SkillTree';
 import type { WaveManager } from '../game/WaveManager';
 import type { UpgradePopup } from '../game/Game';
 import type { MapData } from '../game/MapGenerator';
@@ -49,6 +49,7 @@ interface RenderState {
   gameSpeed: 1 | 2;
   debugMode: boolean;
   pendingAffinity: ElementType;
+  mousePos: Vec2;
 }
 
 export class Renderer {
@@ -169,7 +170,7 @@ export class Renderer {
     ctx.fillStyle='#ddddff'; ctx.font='bold 36px Segoe UI';
     ctx.fillText('✨  Escolha sua Aptidão Elemental',cw/2,72);
     ctx.font='14px Segoe UI'; ctx.fillStyle='#8888aa';
-    ctx.fillText('Seu elemento: 2× dano.  Elemento oposto: ½ dano.',cw/2,104);
+    ctx.fillText('Seu elemento: torres desse tipo causam 2× dano.  Sem penalidade nos demais.',cw/2,104);
     ctx.fillText('50 atributos iniciais distribuídos aleatoriamente (mín. 5 cada).',cw/2,122);
 
     const elems:ElementType[]=['fire','water','earth','wind'];
@@ -184,11 +185,9 @@ export class Renderer {
       ctx.fillText(ELEMENT_ICONS[el],rx+cW/2,cardY+64);
       ctx.font='bold 18px Segoe UI'; ctx.fillText(ELEMENT_NAMES[el],rx+cW/2,cardY+96);
       ctx.font='12px Segoe UI'; ctx.fillStyle='#88ff88';
-      ctx.fillText('2× dano',rx+cW/2,cardY+118);
-      ctx.fillStyle='#ff8888';
-      ctx.fillText('½ dano: '+ELEMENT_NAMES[OPPOSITE_ELEMENT[el]],rx+cW/2,cardY+136);
+      ctx.fillText('2× dano para torres deste elemento',rx+cW/2,cardY+118);
       ctx.fillStyle='#778899'; ctx.font='10px Segoe UI';
-      wrapText(ELEMENT_DESCRIPTIONS[el],28).forEach((l,li)=>ctx.fillText(l,rx+cW/2,cardY+158+li*14));
+      wrapText(ELEMENT_DESCRIPTIONS[el],28).forEach((l,li)=>ctx.fillText(l,rx+cW/2,cardY+144+li*14));
       const by=cardY+cH-40;
       this.rr(ctx,rx+14,by,cW-28,30,8);
       ctx.fillStyle=ELEMENT_COLORS[el]+'44'; ctx.fill();
@@ -454,7 +453,7 @@ export class Renderer {
     this.renderSidebar(state);
 
     // Items HUD (top of game area)
-    this.renderItemsHUD(ctx, g.items);
+    this.renderItemsHUD(ctx, g.items, state.mousePos);
 
     // Wave progress bar (bottom strip)
     this.renderWaveBar(state.game.waveManager, state.game.enemies);
@@ -540,7 +539,7 @@ export class Renderer {
   }
 
   // ─── Items HUD (top of game area) ──────────────────────────────────────────
-  private renderItemsHUD(ctx: CanvasRenderingContext2D, items: OwnedItem[]) {
+  private renderItemsHUD(ctx: CanvasRenderingContext2D, items: OwnedItem[], mouse: Vec2) {
     if(items.length===0) return;
     const padding=4, iconSize=28, gap=3;
     const totalW=items.length*(iconSize+gap)-gap+padding*2;
@@ -553,28 +552,66 @@ export class Renderer {
     this.rr(ctx,hx,hy,totalW,iconSize+padding*2,6); ctx.stroke();
 
     let ix=hx+padding;
+    let hoveredDef: (typeof ITEM_DEFS)[0]|null=null;
+    let hoveredX=0, hoveredStacks=1;
+
     for(const owned of items){
       const def=ITEM_DEFS.find(d=>d.id===owned.defId);
       if(!def) continue;
       const rc=ITEM_RARITY_COLORS[def.rarity];
+      const itemRect={x:ix,y:hy+padding,w:iconSize,h:iconSize};
+
+      // Detect hover
+      const hovered=mouse.x>=itemRect.x&&mouse.x<=itemRect.x+itemRect.w&&
+                    mouse.y>=itemRect.y&&mouse.y<=itemRect.y+itemRect.h;
+      if(hovered){ hoveredDef=def; hoveredX=ix+iconSize/2; hoveredStacks=owned.stacks; }
 
       // Item background
-      ctx.fillStyle=def.rarity==='legendary'?'#2a2000':def.rarity==='rare'?'#0a1530':'#141422';
+      ctx.fillStyle=def.rarity==='legendary'?'#2a2000':def.rarity==='epic'?'#1a0030':def.rarity==='rare'?'#0a1530':'#141422';
       this.rr(ctx,ix,hy+padding,iconSize,iconSize,4); ctx.fill();
-      ctx.strokeStyle=rc+'aa'; ctx.lineWidth=1;
+      ctx.strokeStyle=hovered?(rc):(rc+'aa'); ctx.lineWidth=hovered?2:1;
       this.rr(ctx,ix,hy+padding,iconSize,iconSize,4); ctx.stroke();
 
-      // Icon
-      ctx.font='14px serif'; ctx.textAlign='center';
-      ctx.fillText(def.icon,ix+iconSize/2,hy+padding+iconSize/2+5);
+      // Icon — use Segoe UI Emoji for reliable rendering
+      ctx.font='16px "Segoe UI Emoji", serif'; ctx.textAlign='center';
+      ctx.fillStyle='#ffffff';
+      ctx.fillText(def.icon,ix+iconSize/2,hy+padding+iconSize/2+6);
 
       // Stack count
       if(owned.stacks>1){
         ctx.fillStyle='#ffffff'; ctx.font='bold 8px Segoe UI';
-        ctx.fillText(`×${owned.stacks}`,ix+iconSize-4,hy+padding+iconSize-1);
+        ctx.textAlign='right';
+        ctx.fillText(`×${owned.stacks}`,ix+iconSize-1,hy+padding+iconSize-1);
       }
       ctx.textAlign='left';
       ix+=iconSize+gap;
+    }
+
+    // Hover tooltip
+    if(hoveredDef){
+      const rc=ITEM_RARITY_COLORS[hoveredDef.rarity];
+      const rarityName=ITEM_RARITY_NAMES[hoveredDef.rarity];
+      const lines=wrapText(hoveredDef.description,30);
+      const tw=Math.max(180, hoveredDef.name.length*8+20);
+      const th=20+14*(lines.length+1)+8;
+      let tx=Math.max(4, Math.min(hoveredX-tw/2, this.gw-tw-4));
+      const ty=hy+padding+iconSize+4;
+
+      ctx.fillStyle='rgba(8,8,24,0.95)';
+      this.rr(ctx,tx,ty,tw,th,8); ctx.fill();
+      ctx.strokeStyle=rc; ctx.lineWidth=1.5;
+      this.rr(ctx,tx,ty,tw,th,8); ctx.stroke();
+
+      ctx.textAlign='center';
+      ctx.fillStyle=rc; ctx.font=`bold 10px Segoe UI`;
+      ctx.fillText(`${hoveredDef.name}${hoveredStacks>1?` ×${hoveredStacks}`:''}`,tx+tw/2,ty+14);
+      ctx.fillStyle='#aaaacc'; ctx.font='9px Segoe UI';
+      ctx.fillText(`[${rarityName}]`,tx+tw/2,ty+24);
+      lines.forEach((l,li)=>{
+        ctx.fillStyle='#ddddee';
+        ctx.fillText(l,tx+tw/2,ty+36+li*13);
+      });
+      ctx.textAlign='left';
     }
   }
 
@@ -749,7 +786,7 @@ export class Renderer {
     }
 
     // Boss shield phase (purple ring)
-    if(enemy.bossShieldActive){
+    if((enemy as any).shieldActive){
       const p=0.5+0.5*Math.sin(Date.now()/150);
       ctx.beginPath(); ctx.arc(x,y,r+12,0,Math.PI*2);
       ctx.strokeStyle=`rgba(160,80,255,${p*0.9})`; ctx.lineWidth=4; ctx.setLineDash([6,3]); ctx.stroke();
@@ -1022,11 +1059,15 @@ export class Renderer {
         fast?'#ffaa44':'#777766');
       this.gameUIBtns['speedToggle']=spdRect;
 
-      // Expand indicator
+      // Expand indicator — apply item discount to displayed cost
       const canExpand=g.currentMapTier<3&&wm.betweenWaves;
-      const expAfford=g.gold>=MAP_EXPAND_COST;
+      let discountFrac=0;
+      for(const owned of g.items){const def=ITEM_DEFS.find(d=>d.id===owned.defId);if(def&&def.effectType==='discount')discountFrac+=def.effectValue*owned.stacks;}
+      discountFrac=Math.min(0.6,discountFrac);
+      const expCost=Math.round(MAP_EXPAND_COST*(1-discountFrac));
+      const expAfford=g.gold>=expCost;
       const expRect={x:sx+10+2*(colW+4),y:indY,w:bw-2*(colW+4),h:22};
-      const expLabel=g.currentMapTier>=3?'🗺 Max':canExpand?`🗺 ${MAP_EXPAND_COST}g`:'🗺 ---';
+      const expLabel=g.currentMapTier>=3?'🗺 Max':canExpand?`🗺 ${expCost}g`:'🗺 ---';
       this.btn(ctx,expRect,expLabel,
         canExpand&&expAfford?'#0a1a1a':'#141414',
         canExpand&&expAfford?'#44cccc':'#335555');
@@ -1138,6 +1179,10 @@ export class Renderer {
     }
     ry+=headerH;
 
+    // Total move cost for all towers on this cell (charged together)
+    const totalMoveCost=here.reduce((s,t)=>s+Math.round(t.placedCost*CFG_MOVE_COST_MULT),0);
+    const canMvAll=gold>=totalMoveCost;
+
     here.forEach((tower,i)=>{
       // Info row
       const infoRect={x:px+8,y:ry,w:pw-16,h:towerH-4};
@@ -1167,7 +1212,8 @@ export class Renderer {
         ctx.fillStyle='#99aacc'; ctx.font='7px Segoe UI';
         ctx.fillText(`Ataque: 50%${ELEMENT_ICONS[pe]}+50%${ELEMENT_ICONS[se]} | Magia: 60%${ELEMENT_ICONS[pe]}+40%${ELEMENT_ICONS[se]}`,infoRect.x+27,infoRect.y+39);
       } else {
-        ctx.fillText(`Venda: ${Math.floor(tower.goldSpent/2)}g | Mover: ${Math.round(tower.placedCost*CFG_MOVE_COST_MULT)}g`,infoRect.x+27,infoRect.y+39);
+        const moveLbl=here.length>1?`Mover tudo: ${totalMoveCost}g`:`Mover: ${totalMoveCost}g`;
+        ctx.fillText(`Venda: ${Math.floor(tower.goldSpent/2)}g | ${moveLbl}`,infoRect.x+27,infoRect.y+39);
       }
       if(tower.dualMagic){ctx.fillStyle='#ffff44'; ctx.font='bold 7px Segoe UI'; ctx.fillText('✨DUAL',infoRect.x+pw-60,infoRect.y+15);}
 
@@ -1182,9 +1228,9 @@ export class Renderer {
       const upgCost=towerUpgradeCost(tower);
       const canUp=!maxed&&gold>=upgCost;
       this.btn(ctx,upRect,maxed?'★ Máx':`⬆ ${upgCost}g`,canUp?'#0d1f0d':'#1a1a1a',canUp?'#55bb55':'#445544');
-      const mvCost=Math.round(tower.placedCost*CFG_MOVE_COST_MULT);
-      const canMv=gold>=mvCost;
-      this.btn(ctx,mvRect,`📦 ${mvCost}g`,canMv?'#0d1522':'#1a1a1a',canMv?'#4499cc':'#335577');
+      // Move label: show total cell cost (all towers move together)
+      const mvLabel=here.length>1?`📦 ${totalMoveCost}g*`:`📦 ${totalMoveCost}g`;
+      this.btn(ctx,mvRect,mvLabel,canMvAll?'#0d1522':'#1a1a1a',canMvAll?'#4499cc':'#335577');
       this.btn(ctx,slRect,`🏷 ${Math.floor(tower.goldSpent/2)}g`,'#220f0f','#cc5533');
 
       this.upgradeBtns[`upgrade_${i}`]=upRect;
@@ -1284,52 +1330,182 @@ export class Renderer {
     });
   }
 
-  // ─── Talent Tree ───────────────────────────────────────────────────────────
-  private renderTalents(player: Player, talentTree: TalentTree){
-    const ctx=this.ctx,cw=this.cw,ch=this.ch;
-    ctx.fillStyle='#07071a'; ctx.fillRect(0,0,cw,ch);
+  // ─── Talent Tree (Path-of-Exile style graph) ────────────────────────────────
+  // Logical canvas: 1000 × 700. Scaled to fit actual screen at render time.
+  private _skillTooltip: string | null = null;
+
+  private renderTalents(player: Player, talentTree: TalentTree) {
+    const ctx=this.ctx, cw=this.cw, ch=this.ch;
+
+    // ── Background ──────────────────────────────────────────────────────────
+    ctx.fillStyle='#04040f'; ctx.fillRect(0,0,cw,ch);
+
+    // Subtle star field
+    ctx.fillStyle='rgba(255,255,255,0.25)';
+    const rng=mulberry32(77);
+    for(let i=0;i<200;i++) ctx.fillRect(rng()*cw,rng()*ch,rng()*1.5+0.5,rng()*1.5+0.5);
+
+    // ── Header ──────────────────────────────────────────────────────────────
     ctx.textAlign='center';
-    ctx.fillStyle='#ddddff'; ctx.font='bold 28px Segoe UI';
-    ctx.fillText('🌟  Árvore de Talentos',cw/2,40);
-    ctx.fillStyle='#8888aa'; ctx.font='13px Segoe UI';
-    ctx.fillText(`Pontos: ${player.talentPoints}  |  Nível: ${player.level}  |  Próximo: nível ${Math.ceil(Math.max(1,player.level)/TALENT_POINT_EVERY)*TALENT_POINT_EVERY}`,cw/2,62);
+    ctx.fillStyle='#ccccff'; ctx.font='bold 22px Segoe UI';
+    ctx.fillText('✨  Constelação de Talentos',cw/2,30);
+    ctx.fillStyle='#6666aa'; ctx.font='12px Segoe UI';
+    const nextPt=Math.ceil(Math.max(1,player.level)/TALENT_POINT_EVERY)*TALENT_POINT_EVERY;
+    ctx.fillText(`Pontos: ${player.talentPoints}  ·  Nível ${player.level}  ·  Próximo ponto: nível ${nextPt}`,cw/2,50);
 
-    const elems:ElementType[]=['fire','water','earth','wind'];
-    const nw=200,nh=78,gy=90,sy=96,colW=cw/4;
+    // ── Coordinate mapping: logical (0-1000 × 0-700) → screen ──────────────
+    const LOGIC_W=1000, LOGIC_H=700;
+    const pad=60;
+    const scaleX=(cw-pad*2)/LOGIC_W, scaleY=(ch-pad-70)/LOGIC_H;
+    const scale=Math.min(scaleX,scaleY);
+    const originX=cw/2 - LOGIC_W*scale/2;
+    const originY=70;
+    const sx=(lx:number)=>originX+lx*scale;
+    const sy=(ly:number)=>originY+ly*scale;
+
+    // ── Element colour map ──────────────────────────────────────────────────
+    const elColor:Record<string,string>={
+      fire:'#ff6633', water:'#3399ff', earth:'#77cc33', wind:'#ffee33', neutral:'#aaaaff',
+    };
+
+    // ── Draw connection lines ────────────────────────────────────────────────
+    const lines=talentTree.getConnectionLines();
+    for(const {fromId,toId,active} of lines){
+      const a=talentTree.nodes.get(fromId), b=talentTree.nodes.get(toId);
+      if(!a||!b) continue;
+      const aPurch=a.purchased, bPurch=b.purchased;
+      const bothPurch=aPurch&&bPurch;
+      ctx.beginPath();
+      ctx.moveTo(sx(a.position.x),sy(a.position.y));
+      ctx.lineTo(sx(b.position.x),sy(b.position.y));
+      if(bothPurch){
+        // Glowing purchased line
+        const col=elColor[a.element]??'#aaaaff';
+        ctx.strokeStyle=col+'99'; ctx.lineWidth=3;
+        ctx.stroke();
+        ctx.strokeStyle=col+'44'; ctx.lineWidth=7;
+        ctx.stroke();
+      } else if(active||(aPurch||bPurch)){
+        ctx.strokeStyle='#445566'; ctx.lineWidth=2;
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle='#1a1a2a'; ctx.lineWidth=1;
+        ctx.stroke();
+      }
+    }
+
+    // ── Draw nodes ───────────────────────────────────────────────────────────
     this.talentRects.clear();
+    const nodeR = Math.max(16, Math.round(22*scale));  // radius scales with canvas
 
-    elems.forEach((el,branch)=>{
-      const cx=branch*colW+colW/2;
-      ctx.fillStyle=ELEMENT_COLORS[el]; ctx.font='bold 13px Segoe UI';
-      ctx.fillText(`${ELEMENT_ICONS[el]} ${ELEMENT_NAMES[el]}`,cx,sy-4);
+    for(const node of talentTree.nodes.values()){
+      const nx=sx(node.position.x), ny=sy(node.position.y);
+      const purchased=node.purchased;
+      const canBuy=node.cost>0 && talentTree.canPurchase(node.id,player.level,player.talentPoints);
+      const col=elColor[node.element]??'#aaaaff';
 
-      talentTree.talents.filter(t=>t.branch===branch).sort((a,b)=>a.tier-b.tier).forEach((talent,ti)=>{
-        const tx=cx-nw/2,ty=sy+ti*gy;
-        const rect={x:tx,y:ty,w:nw,h:nh};
-        const canBuy=talentTree.canPurchase(talent,player.level,player.stats,player.talentPoints);
-        ctx.fillStyle=talent.purchased?'#152215':canBuy?'#141428':'#0e0e1a';
-        this.rr(ctx,tx,ty,nw,nh,8); ctx.fill();
-        ctx.strokeStyle=talent.purchased?'#44cc44':canBuy?'#6666cc':'#2a2a40';
-        ctx.lineWidth=talent.purchased?2:1; this.rr(ctx,tx,ty,nw,nh,8); ctx.stroke();
-        if(ti>0){
-          const prev=talentTree.talents.find(t=>t.branch===branch&&t.tier===ti-1);
-          ctx.strokeStyle=prev?.purchased?'#33aa3355':'#33333355'; ctx.lineWidth=2;
-          ctx.beginPath(); ctx.moveTo(cx,sy+(ti-1)*gy+nh); ctx.lineTo(cx,ty); ctx.stroke();
-        }
-        ctx.fillStyle=talent.purchased?'#88ff88':canBuy?'#aaaaff':'#445566';
-        ctx.font='bold 11px Segoe UI'; ctx.fillText(talent.name,cx,ty+17);
-        ctx.fillStyle=talent.purchased?'#66aa66':'#666688'; ctx.font='10px Segoe UI';
-        wrapText(talent.description,26).forEach((l,li)=>ctx.fillText(l,cx,ty+31+li*12));
-        ctx.fillStyle='#445544'; ctx.font='8px Segoe UI';
-        ctx.fillText(`Nível ${talent.requiredLevel}`,cx,ty+nh-15);
-        if(!talent.purchased){ctx.fillStyle=canBuy?'#dddd44':'#444433'; ctx.fillText(`${talent.cost}pt`,cx,ty+nh-4);}
-        this.talentRects.set(talent.id,rect);
-      });
-    });
+      // Outer glow for purchasable nodes
+      if(canBuy){
+        ctx.beginPath(); ctx.arc(nx,ny,nodeR+6,0,Math.PI*2);
+        ctx.fillStyle=col+'22'; ctx.fill();
+      }
 
+      // Node background
+      ctx.beginPath(); ctx.arc(nx,ny,nodeR,0,Math.PI*2);
+      if(purchased)       ctx.fillStyle=col+'55';
+      else if(canBuy)     ctx.fillStyle='#1a1a3a';
+      else                ctx.fillStyle='#0a0a16';
+      ctx.fill();
+
+      // Node border
+      ctx.beginPath(); ctx.arc(nx,ny,nodeR,0,Math.PI*2);
+      ctx.strokeStyle=purchased?col:canBuy?(col+'88'):'#2a2a44';
+      ctx.lineWidth=purchased?2.5:1.5;
+      ctx.stroke();
+
+      // Icon
+      const iconSize=Math.max(10,Math.round(14*scale));
+      ctx.font=`${iconSize}px "Segoe UI Emoji", serif`;
+      ctx.textAlign='center';
+      ctx.fillStyle=purchased?'#ffffff':canBuy?col+'cc':'#334455';
+      ctx.fillText(node.icon,nx,ny+iconSize*0.35);
+
+      // Name label (below node)
+      const labelSize=Math.max(7,Math.round(9*scale));
+      ctx.font=`${purchased?'bold ':''} ${labelSize}px Segoe UI`;
+      ctx.fillStyle=purchased?col:canBuy?'#9999cc':'#334455';
+      ctx.fillText(node.name,nx,ny+nodeR+labelSize+2);
+
+      // Cost badge (only unpurchased non-free nodes)
+      if(!purchased && node.cost>0){
+        const badgeSize=Math.max(6,Math.round(8*scale));
+        ctx.font=`${badgeSize}px Segoe UI`;
+        ctx.fillStyle=canBuy?'#ffee44':'#445544';
+        ctx.fillText(`${node.cost}pt`,nx,ny+nodeR+labelSize+badgeSize+4);
+      }
+
+      // Hit-rect (used for click & tooltip)
+      const hw=nodeR*2+20, hh=nodeR*2+30;
+      this.talentRects.set(node.id,{x:nx-hw/2, y:ny-nodeR, w:hw, h:hh});
+    }
+
+    // ── Tooltip on hover ────────────────────────────────────────────────────
+    for(const [id,r] of this.talentRects){
+      if(this._mousePos && this._mousePos.x>=r.x && this._mousePos.x<=r.x+r.w
+          && this._mousePos.y>=r.y && this._mousePos.y<=r.y+r.h){
+        const node=talentTree.nodes.get(id);
+        if(node) this._renderSkillTooltip(ctx,node,player.talentPoints,
+          talentTree.canPurchase(id,player.level,player.talentPoints),elColor);
+        break;
+      }
+    }
+
+    // ── Back button ─────────────────────────────────────────────────────────
     const backRect={x:20,y:ch-48,w:160,h:34};
     this.btn(ctx,backRect,'← Voltar','#1a1a2e','#6666aa');
     this.talentBackRect=backRect;
+    ctx.textAlign='center';
+  }
+
+  private _mousePos: {x:number;y:number}|null = null;
+
+  /** Call from Game.ts each frame to pass current mouse position to renderer */
+  setMousePos(pos:{x:number;y:number}) { this._mousePos=pos; }
+
+  private _renderSkillTooltip(
+    ctx: CanvasRenderingContext2D,
+    node: {name:string;description:string;element:string;requires:string[];requiredLevel:number;cost:number;purchased:boolean},
+    talentPoints: number,
+    canBuy: boolean,
+    elColor: Record<string,string>,
+  ){
+    const mx=this._mousePos!.x, my=this._mousePos!.y;
+    const cw=this.cw, ch=this.ch;
+    const tw=220, lines=wrapText(node.description,32);
+    const th=22+14*(lines.length+2)+12;
+    let tx=mx+16, ty=my-th/2;
+    if(tx+tw>cw-8) tx=mx-tw-8;
+    if(ty<8)       ty=8;
+    if(ty+th>ch-8) ty=ch-th-8;
+
+    ctx.fillStyle='#0c0c22ee';
+    this.rr(ctx,tx,ty,tw,th,8); ctx.fill();
+    ctx.strokeStyle=elColor[node.element]??'#aaaaff';
+    ctx.lineWidth=1.5; this.rr(ctx,tx,ty,tw,th,8); ctx.stroke();
+
+    ctx.textAlign='left';
+    ctx.fillStyle=elColor[node.element]??'#ccccff'; ctx.font='bold 12px Segoe UI';
+    ctx.fillText(node.name,tx+10,ty+16);
+    ctx.fillStyle='#778899'; ctx.font='10px Segoe UI';
+    lines.forEach((l,i)=>ctx.fillText(l,tx+10,ty+30+i*13));
+    const reqY=ty+30+lines.length*13+4;
+    if(node.requires.length>0){
+      ctx.fillStyle='#556677'; ctx.font='9px Segoe UI';
+      ctx.fillText('Requer: '+node.requires.join(', '),tx+10,reqY+10);
+    }
+    ctx.fillStyle=node.purchased?'#44cc44':canBuy?'#ffee44':'#664444';
+    ctx.font='9px Segoe UI';
+    ctx.fillText(node.purchased?'✓ Comprado':canBuy?`${node.cost}pt — disponível`:`Nível ${node.requiredLevel} necessário`,tx+10,reqY+22);
     ctx.textAlign='center';
   }
 

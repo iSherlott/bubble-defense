@@ -131,12 +131,14 @@ export interface FusionDef {
   description: string;
   /** Magic damage multiplier applied on top of primary magic damage */
   magicDamageMult: number;
+  /** Multiplier on the magic bar max (e.g. 2 = takes 2× longer to charge) */
+  magicBarMaxMult?: number;
   /** Special effect ID */
   specialEffect: string;
 }
 
 // ─── Item System ──────────────────────────────────────────────────────────────
-export type ItemRarity = 'common' | 'rare' | 'legendary';
+export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary';
 
 export interface ItemDef {
   id: string;
@@ -145,7 +147,13 @@ export interface ItemDef {
   rarity: ItemRarity;
   description: string;
   /** The effect type for stacking */
-  effectType: 'gold_mult' | 'slow_aura' | 'discount';
+  effectType:
+    | 'gold_mult' | 'slow_aura' | 'discount'
+    | 'fire_dmg' | 'water_atkspd' | 'earth_range' | 'wind_stun_dur'
+    | 'fire_magic_charge' | 'water_slow_amp' | 'earth_radius' | 'wind_push_tiles'
+    | 'hunter_dmg' | 'fire_magma_trail' | 'water_freeze' | 'earth_sandstorm'
+    | 'wind_chain_magic' | 'titan_shield' | 'wave_gold_bonus' | 'fire_aoe_splash'
+    | 'boss_dmg_bonus' | 'all_towers_buff' | 'cataclysm';
   effectValue: number;
 }
 
@@ -179,7 +187,13 @@ export interface SaveData {
     lives: number;
     wave: number;
     score: number;
-    mapSeed?: number;
+    mapSeed?: number;      // legacy — kept for backward compat
+    /** Exact serialized map so the path is pixel-perfect on reload */
+    map?: {
+      cols: number; rows: number; tier: number;
+      waypoints: { x: number; y: number }[];
+      pathCells: string[];   // "col,row" strings
+    };
     items: Array<{ defId: string; stacks: number }>;
     towers: Array<{
       typeId: string;

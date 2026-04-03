@@ -1,7 +1,8 @@
 import { ENEMY_DEFS, BOSS_DEFS, GOLEM_DEFS } from '../constants';
 import { CFG_WAVE_BASE_COUNT, CFG_WAVE_COUNT_PER_WAVE, CFG_ELITE_START_WAVE,
   CFG_ELITE_BASE_MULT, CFG_ELITE_MAX_MULT, CFG_ELITE_SCALE_WAVES } from '../settings';
-import { Enemy, resetEnemyIds } from '../entities/Enemy';
+import { createEnemy, resetEnemyIds } from '../entities/Enemy';
+import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { Vec2 } from '../types';
 
 interface SpawnQueue {
@@ -128,10 +129,10 @@ export class WaveManager {
     return this.enemiesKilledThisWave / this.totalEnemiesThisWave;
   }
 
-  update(dt: number, activeEnemies: Enemy[], waypoints: Vec2[], totalLength: number): Enemy[] {
+  update(dt: number, activeEnemies: BaseEnemy[], waypoints: Vec2[], totalLength: number): BaseEnemy[] {
     if (!this.waveActive) return [];
 
-    const spawned: Enemy[] = [];
+    const spawned: BaseEnemy[] = [];
     const dtMs = dt * 1000;
 
     // All enemy defs combined
@@ -146,7 +147,8 @@ export class WaveManager {
           const def = allDefs.find(d => d.id === q.typeId);
           if (!def) { q.spawned++; continue; }
           const eliteMult = q.isElite ? eliteMultForWave(this.currentWave) : 1;
-          const e = new Enemy(def, this.currentWave, eliteMult);
+          // Use the factory — picks BossEnemy / GolemEnemy / StandardEnemy automatically
+          const e = createEnemy(def, this.currentWave, eliteMult);
           if (q.isElite) (e as any)._elite = true;  // mark for rendering
           e.pos = { x: waypoints[0]?.x ?? 0, y: waypoints[0]?.y ?? 0 };
           spawned.push(e);

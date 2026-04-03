@@ -22,7 +22,7 @@ function seededRng(seed: number) {
   };
 }
 
-function computePathLength(waypoints: Vec2[]): number {
+export function computePathLength(waypoints: Vec2[]): number {
   let total = 0;
   for (let i = 1; i < waypoints.length; i++) {
     total += Math.hypot(
@@ -134,24 +134,48 @@ export function extendMap(existing: MapData, seed: number, newTier: number): Map
   const exitRow = Math.round((exitWp.y - CELL_SIZE / 2) / CELL_SIZE);
 
   // Build new segment starting at (existing.cols-1, exitRow) → (cfg.cols-1, finalRow)
+  // Always force at least one vertical turn regardless of how narrow the extension is.
   const pts: { col: number; row: number }[] = [{ col: existing.cols - 1, row: exitRow }];
   let cx = existing.cols - 1, cy = exitRow;
+  const newColSpan = cfg.cols - existing.cols;  // how many columns we're adding
 
+  // Split into 2 horizontal segments with a forced vertical turn between them
+  const mid1 = existing.cols - 1 + Math.max(1, Math.floor(newColSpan * (0.35 + rng() * 0.3)));
+  const midCol = Math.min(mid1, cfg.cols - 2);
+
+  // First horizontal segment → midpoint
+  cx = midCol;
+  pts.push({ col: cx, row: cy });
+
+  // Vertical turn at midpoint
+  const distToTop    = cy - 1;
+  const distToBottom = newRows - 2 - cy;
+  let dirBias = 0;
+  if (distToTop < 3)    dirBias =  1;
+  if (distToBottom < 3) dirBias = -1;
+  const dir  = dirBias !== 0 ? dirBias : (rng() < 0.5 ? 1 : -1);
+  const vDist = 2 + Math.floor(rng() * cfg.maxSegV);
+  const nextCy = Math.max(1, Math.min(newRows - 2, cy + dir * vDist));
+  if (nextCy !== cy) {
+    pts.push({ col: cx, row: nextCy });
+    cy = nextCy;
+  }
+
+  // Second horizontal segment → end; optionally add more segments if enough room
   while (cx < cfg.cols - 3) {
-    const advance = cfg.minSegH + Math.floor(rng() * (cfg.maxSegH - cfg.minSegH + 1));
+    const advance = 2 + Math.floor(rng() * 4);
     cx = Math.min(cx + advance, cfg.cols - 3);
     pts.push({ col: cx, row: cy });
     if (cx >= cfg.cols - 3) break;
 
-    const distToTop    = cy - 1;
-    const distToBottom = newRows - 2 - cy;
-    let dirBias = 0;
-    if (distToTop < 3)    dirBias =  1;
-    if (distToBottom < 3) dirBias = -1;
-    const dir   = dirBias !== 0 ? dirBias : (rng() < 0.5 ? 1 : -1);
-    const vDist = 2 + Math.floor(rng() * cfg.maxSegV);
-    const nextCy = Math.max(1, Math.min(newRows - 2, cy + dir * vDist));
-    if (nextCy !== cy) { pts.push({ col: cx, row: nextCy }); cy = nextCy; }
+    const dTop = cy - 1, dBot = newRows - 2 - cy;
+    let db2 = 0;
+    if (dTop < 3) db2 = 1;
+    if (dBot < 3) db2 = -1;
+    const d2  = db2 !== 0 ? db2 : (rng() < 0.5 ? 1 : -1);
+    const vd2 = 2 + Math.floor(rng() * cfg.maxSegV);
+    const nc2 = Math.max(1, Math.min(newRows - 2, cy + d2 * vd2));
+    if (nc2 !== cy) { pts.push({ col: cx, row: nc2 }); cy = nc2; }
   }
   if (pts[pts.length - 1].col < cfg.cols - 1) pts.push({ col: cfg.cols - 1, row: cy });
 

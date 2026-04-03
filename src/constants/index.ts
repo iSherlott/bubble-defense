@@ -53,10 +53,10 @@ export const ELEMENT_NAMES: Record<ElementType, string> = {
   fire: 'Fogo', water: 'Água', earth: 'Terra', wind: 'Vento',
 };
 export const ELEMENT_DESCRIPTIONS: Record<ElementType, string> = {
-  fire:  'Torres de Fogo causam 2× dano. Torres de Água causam ½ dano.',
-  water: 'Torres de Água causam 2× dano. Torres de Fogo causam ½ dano.',
-  earth: 'Torres de Terra causam 2× dano. Torres de Vento causam ½ dano.',
-  wind:  'Torres de Vento causam 2× dano. Torres de Terra causam ½ dano.',
+  fire:  'Torres de Fogo causam 2× dano. Especialista em ataques diretos e queimaduras.',
+  water: 'Torres de Água causam 2× dano. Especialista em lentidão permanente.',
+  earth: 'Torres de Terra causam 2× dano. Especialista em explosões em área.',
+  wind:  'Torres de Vento causam 2× dano. Especialista em empurrar e controlar inimigos.',
 };
 export const OPPOSITE_ELEMENT: Record<ElementType, ElementType> = {
   fire: 'water', water: 'fire', earth: 'wind', wind: 'earth',
@@ -140,7 +140,7 @@ export const GOLEM_DEFS: EnemyDef[] = [
     baseHp: 300, speed: 35, agility: 2,
     immune: 'water', halfElements: ['wind', 'earth'],
     color: '#cc4400', size: 20, baseLivesLost: 2, reward: 35, xp: 12,
-    description: 'Cada dano recebido cura 0.3% do HP máx.',
+    description: 'Imune a qualquer dano com componente de Fogo.',
     golemType: 'fire',
   },
   {
@@ -343,7 +343,21 @@ export const FUSION_DEFS: FusionDef[] = [
     icon:'❄', color:'#aaeeff', description:'Tempestade de gelo que congela em área.',
     magicDamageMult:1.6, specialEffect:'blizzard' },
 
-  // Wind primary
+  // Same-element fusions (double mastery)
+  { id:'fire+fire',   name:'Núcleo Solar',      primaryElement:'fire',  secondaryElement:'fire',
+    icon:'☀', color:'#ffcc00', description:'Domínio total do Fogo: dano mágico massivo em área e queimadura eterna.',
+    magicDamageMult:2.5, specialEffect:'solar_core' },
+  { id:'water+water', name:'Vórtice Abissal',   primaryElement:'water', secondaryElement:'water',
+    icon:'🌀', color:'#00ccff', description:'Domínio total da Água: lentidão extrema e pulsos de gelo em área.',
+    magicDamageMult:2.3, specialEffect:'abyssal_vortex' },
+  { id:'earth+earth', name:'Terremoto Primordial', primaryElement:'earth', secondaryElement:'earth',
+    icon:'🌋', color:'#aacc44', description:'Domínio total da Terra: tremor colossal que atinge toda a tela.',
+    magicDamageMult:2.8, specialEffect:'primal_quake' },
+  { id:'wind+wind',   name:'Furacão Eterno',    primaryElement:'wind',  secondaryElement:'wind',
+    icon:'⚡', color:'#eeff44', description:'Domínio do Vento: empurra 3 tiles todos em 1.5× o alcance. Carga de magia 2× mais lenta.',
+    magicDamageMult:2.2, magicBarMaxMult:2, specialEffect:'eternal_hurricane' },
+
+  // Wind primary (cross-element)
   { id:'wind+fire',   name:'Relâmpago',   primaryElement:'wind', secondaryElement:'fire',
     icon:'⚡', color:'#ffff00', description:'Raio devastador que atinge múltiplos alvos em cadeia.',
     magicDamageMult:2.2, specialEffect:'lightning' },
@@ -361,32 +375,85 @@ export function getFusionDef(primaryElement: string, secondaryElement: string): 
 
 // ─── Item Definitions ─────────────────────────────────────────────────────────
 export const ITEM_DEFS: ItemDef[] = [
-  { id:'gold_2x',      name:'Saco de Moedas',      icon:'💰', rarity:'common',
-    description:'Cada inimigo dá +2 moedas.',    effectType:'gold_mult', effectValue:2 },
-  { id:'gold_5x',      name:'Baú de Ouro',         icon:'🪙', rarity:'rare',
-    description:'Cada inimigo dá +5 moedas.',    effectType:'gold_mult', effectValue:5 },
-  { id:'gold_10x',     name:'Tesouro do Dragão',   icon:'👑', rarity:'legendary',
-    description:'Cada inimigo dá +7 moedas.',   effectType:'gold_mult', effectValue:7 },
-  { id:'slow_1s',      name:'Aura Gélida',         icon:'🧊', rarity:'legendary',
-    description:'Inimigos surgem com 1s de lentidão.', effectType:'slow_aura', effectValue:1.0 },
-  { id:'discount_1',   name:'Cupom de Desconto',   icon:'🏷', rarity:'common',
-    description:'1% de desconto em compras.',     effectType:'discount', effectValue:0.01 },
-  { id:'discount_5',   name:'Negociante Astuto',   icon:'🤝', rarity:'common',
-    description:'5% de desconto em compras.',     effectType:'discount', effectValue:0.05 },
-  { id:'discount_10',  name:'Mestre Mercador',     icon:'🎩', rarity:'rare',
-    description:'10% de desconto em compras.',    effectType:'discount', effectValue:0.10 },
-  { id:'discount_50',  name:'Pacto Demoníaco',     icon:'😈', rarity:'legendary',
-    description:'30% de desconto em compras.',    effectType:'discount', effectValue:0.30 },
+  // ── Comum ───────────────────────────────────────────────────────────────────
+  { id:'ember_sentry',    name:'Brasa do Vigia',          icon:'🔥', rarity:'common',
+    description:'Torres de Fogo causam +8% de dano.',
+    effectType:'fire_dmg', effectValue:0.08 },
+  { id:'tide_drop',       name:'Gota de Maré',            icon:'💧', rarity:'common',
+    description:'Torres de Água atacam +10% mais rápido.',
+    effectType:'water_atkspd', effectValue:0.10 },
+  { id:'runic_pebble',    name:'Seixo Rúnico',            icon:'💎', rarity:'common',
+    description:'Torres de Terra têm +12% de alcance.',
+    effectType:'earth_range', effectValue:0.12 },
+  { id:'wind_feather',    name:'Pena de Corrente',        icon:'🌿', rarity:'common',
+    description:'Efeitos de controle do Vento duram +15%.',
+    effectType:'wind_stun_dur', effectValue:0.15 },
+  { id:'scout_buckle',    name:'Fivela do Batedor',       icon:'🥇', rarity:'common',
+    description:'+1 ouro por inimigo derrotado.',
+    effectType:'gold_mult', effectValue:1 },
+
+  // ── Rara ────────────────────────────────────────────────────────────────────
+  { id:'volcanic_hourglass', name:'Ampulheta Vulcânica',  icon:'⌛', rarity:'rare',
+    description:'Torres de Fogo carregam magia +20% mais rápido.',
+    effectType:'fire_magic_charge', effectValue:0.20 },
+  { id:'deep_tide_medal',    name:'Medalhão da Maré Profunda', icon:'🌊', rarity:'rare',
+    description:'Lentidões permanentes de Água são +25% mais fortes.',
+    effectType:'water_slow_amp', effectValue:0.25 },
+  { id:'seismic_totem',      name:'Totem da Falha Sísmica',icon:'🗿', rarity:'rare',
+    description:'Raio de magia e explosões de Terra aumentam +20%.',
+    effectType:'earth_radius', effectValue:0.20 },
+  { id:'gale_insignia',      name:'Insígnia do Vendaval',  icon:'🌀', rarity:'rare',
+    description:'Empurrão do Vento empurra +1 tile adicional.',
+    effectType:'wind_push_tiles', effectValue:1 },
+  { id:'golem_hunter',       name:'Lanterna do Caçador',   icon:'🔦', rarity:'rare',
+    description:'+18% de dano contra elites, golems e chefes.',
+    effectType:'hunter_dmg', effectValue:0.18 },
+
+  // ── Épica ───────────────────────────────────────────────────────────────────
+  { id:'magma_heart',     name:'Coração de Magma',         icon:'🌋', rarity:'epic',
+    description:'Magia de Fogo deixa zona incandescente por 4s (20% dano mágico/s).',
+    effectType:'fire_magma_trail', effectValue:0.20 },
+  { id:'blizzard_crown',  name:'Coroa da Nevasca',         icon:'❄', rarity:'epic',
+    description:'Magia de Água tem 20% de chance de congelar o inimigo por 1.2s.',
+    effectType:'water_freeze', effectValue:0.20 },
+  { id:'sandstorm_eye',   name:'Olho da Tempestade de Areia', icon:'🏜', rarity:'epic',
+    description:'Magia de Terra reduz vel. 20% e precisão 15% por 5s.',
+    effectType:'earth_sandstorm', effectValue:0.20 },
+  { id:'hurricane_horn',  name:'Trombeta do Furacão',      icon:'🌪', rarity:'epic',
+    description:'Magia de Vento atinge 3 inimigos alinhados com +30% de dano.',
+    effectType:'wind_chain_magic', effectValue:0.30 },
+  { id:'titan_seal',      name:'Selo do Titã Sombrio',     icon:'🛡', rarity:'epic',
+    description:'A cada 3 ondas, cria um escudo que anula 1 vida perdida.',
+    effectType:'titan_shield', effectValue:3 },
+
+  // ── Lendária ────────────────────────────────────────────────────────────────
+  { id:'goblin_throne',   name:'Trono do Rei Goblin',      icon:'👑', rarity:'legendary',
+    description:'+40 ouro no início de cada onda; inimigos valem +2 ouro extra.',
+    effectType:'wave_gold_bonus', effectValue:40 },
+  { id:'chaos_wing',      name:'Asa do Dragão Caótico',    icon:'🐉', rarity:'legendary',
+    description:'Ataques e magias de Fogo causam +25% de dano a inimigos adjacentes.',
+    effectType:'fire_aoe_splash', effectValue:0.25 },
+  { id:'shadow_core',     name:'Núcleo do Titã das Sombras', icon:'💜', rarity:'legendary',
+    description:'+30% de dano contra chefes e inimigos com mais de 70% de HP.',
+    effectType:'boss_dmg_bonus', effectValue:0.30 },
+  { id:'four_tides_crown',name:'Coroa das Quatro Marés',   icon:'🌈', rarity:'legendary',
+    description:'Todas as torres +12% dano, +12% vel. ataque, +15% carga de magia.',
+    effectType:'all_towers_buff', effectValue:0.12 },
+  { id:'cataclysm_relic', name:'Relicário do Cataclismo',  icon:'💥', rarity:'legendary',
+    description:'A cada 20s, explosão global: 250% do dano mágico da torre mais forte a todos os inimigos.',
+    effectType:'cataclysm', effectValue:2.50 },
 ];
 
 export const ITEM_RARITY_COLORS: Record<string, string> = {
-  common: '#aaaaaa',
-  rare: '#5599ff',
+  common:    '#aaaaaa',
+  rare:      '#5599ff',
+  epic:      '#cc44ff',
   legendary: '#ffaa00',
 };
 
 export const ITEM_RARITY_NAMES: Record<string, string> = {
-  common: 'Comum',
-  rare: 'Raro',
-  legendary: 'Lendário',
+  common:    'Comum',
+  rare:      'Rara',
+  epic:      'Épica',
+  legendary: 'Lendária',
 };
