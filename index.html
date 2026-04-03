@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Defense Power</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background: #0a0a0f;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        overflow: hidden;
+      }
+      #game-container {
+        position: relative;
+        user-select: none;
+      }
+      canvas {
+        display: block;
+        cursor: pointer;
+        border: 2px solid #333;
+        box-shadow: 0 0 40px rgba(100,100,255,0.3);
+      }
+      #modal-overlay {
+        display: none;
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 10;
+        justify-content: center;
+        align-items: center;
+      }
+      #modal-overlay.visible { display: flex; }
+      #modal-box {
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        border: 2px solid #4a4a8a;
+        border-radius: 12px;
+        padding: 24px;
+        min-width: 320px;
+        max-width: 420px;
+        color: #e0e0ff;
+        box-shadow: 0 0 30px rgba(80,80,200,0.4);
+        position: relative;
+      }
+      #modal-box h2 { font-size: 1.4em; margin-bottom: 12px; color: #a0a0ff; }
+      #modal-box .modal-close {
+        position: absolute; top: 12px; right: 16px;
+        cursor: pointer; font-size: 1.4em; color: #888;
+        background: none; border: none;
+        transition: color 0.2s;
+      }
+      #modal-box .modal-close:hover { color: #fff; }
+      .modal-row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 0.9em; }
+      .modal-row .label { color: #888; }
+      .modal-row .value { color: #e0e0ff; font-weight: bold; }
+      .element-badge {
+        display: inline-block;
+        padding: 2px 8px; border-radius: 4px;
+        font-size: 0.8em; margin: 2px;
+        font-weight: bold;
+      }
+      .elem-fire { background: #8b2500; color: #ffaa66; }
+      .elem-water { background: #003366; color: #66aaff; }
+      .elem-earth { background: #2d4a00; color: #88cc44; }
+      .elem-wind { background: #404400; color: #dddd44; }
+      .resist-immune { color: #ff4444; }
+      .resist-half { color: #ffaa44; }
+      .resist-weak { color: #44ff44; }
+      .modal-divider { border: none; border-top: 1px solid #333; margin: 12px 0; }
+    </style>
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas id="gameCanvas"></canvas>
+      <div id="modal-overlay">
+        <div id="modal-box">
+          <button class="modal-close" id="modal-close-btn">✕</button>
+          <div id="modal-content"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
