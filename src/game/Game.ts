@@ -422,32 +422,35 @@ export class Game {
     const { cols, rows, pathCells } = this.map;
     if (col < 0 || col >= cols || row < 0 || row >= rows) return;
     if (pathCells.has(`${col},${row}`)) return;
-    const here = this.towersAt(col, row);
     const sameCell = col === tower.gridX && row === tower.gridY;
-    const maxSlot = tower.slotIndex === 1 ? 0 : 1;  // same-cell slot check
-    if (!sameCell && here.length >= 2) return;
-    const moveCost = Math.round(tower.placedCost * CFG_MOVE_COST_MULT);
-    if (this.gold < moveCost) {
-      this.addFT({ x: tower.pixelX, y: tower.pixelY }, `Sem ouro (${moveCost}g)`, '#ff6666');
+    if (sameCell) return;
+
+    // Collect all towers on the source cell (primary + secondary)
+    const cellTowers = this.towersAt(tower.gridX, tower.gridY);
+    const destTowers = this.towersAt(col, row);
+
+    // Cannot move if destination already has towers
+    if (destTowers.length > 0) {
+      this.addFT({ x: tower.pixelX, y: tower.pixelY }, 'Célula ocupada', '#ff6666');
       return;
     }
-    this.gold -= moveCost;
-    // Rebuild tower at new position (same slot)
-    const newTower = new Tower(tower.def, col, row, tower.slotIndex);
-    newTower.damageMult    = tower.damageMult;
-    newTower.speedMult     = tower.speedMult;
-    newTower.upgradeCount  = tower.upgradeCount;
-    newTower.upgradeHistory = tower.upgradeHistory;
-    newTower.dualMagic     = tower.dualMagic;
-    newTower.placedCost    = tower.placedCost;
-    newTower.goldSpent     = tower.goldSpent;
-    newTower.isSecondary   = tower.isSecondary;
-    newTower.fusionDef     = tower.fusionDef;
-    newTower.totalDamageDealt = tower.totalDamageDealt;
-    newTower.totalKills    = tower.totalKills;
-    this.towers = this.towers.filter(t => t.id !== tower.id);
-    this.towers.push(newTower);
-    this.addFT({ x: newTower.pixelX, y: newTower.pixelY }, `Movido (-${moveCost}g)`, '#aaccff');
+
+    // Total move cost: sum of each tower's move cost
+    let totalMoveCost = 0;
+    for (const t of cellTowers) {
+      totalMoveCost += Math.round(t.placedCost * CFG_MOVE_COST_MULT);
+    }
+    if (this.gold < totalMoveCost) {
+      this.addFT({ x: tower.pixelX, y: tower.pixelY }, `Sem ouro (${totalMoveCost}g)`, '#ff6666');
+      return;
+    }
+    this.gold -= totalMoveCost;
+
+    // Move all towers in-place, preserving id, cooldown, magicBar, etc.
+    for (const t of cellTowers) {
+      t.moveTo(col, row, t.slotIndex);
+    }
+    this.addFT({ x: cellTowers[0].pixelX, y: cellTowers[0].pixelY }, `Movido (-${totalMoveCost}g)`, '#aaccff');
   }
 
   expandMap() {
@@ -581,7 +584,7 @@ export class Game {
     return Math.round(bonus);
   }
 
-  /** Total discount fraction from items (capped at 0.9) */
+  /** Total discount fraction from items (capped at 0.6) */
   getItemDiscount(): number {
     let disc = 0;
     for (const owned of this.items) {
@@ -603,10 +606,10 @@ export class Game {
 
   /**
    * Tiered synergy bonus based on minimum tower level on the cell:
-   *  - Both level 5+: +10% damage
+   *  - 2 towers present: +10% damage (base)
+   *  - Both level 5+: +15% damage
    *  - Both level 8+: +20% damage
    *  - Both max level: +30% damage (pre-fusion peak)
-   * Falls back to flat +15% if only 2 towers present (legacy)
    */
   getSynergyBonus(tower: Tower): number {
     const here = this.towersAt(tower.gridX, tower.gridY);
@@ -614,8 +617,8 @@ export class Game {
     const minLevel = Math.min(...here.map(t => t.level));
     if (minLevel >= MAX_TOWER_LEVEL + 1) return 0.30;  // both max level
     if (minLevel >= 8) return 0.20;
-    if (minLevel >= 5) return 0.10;
-    return CFG_SYNERGY_DAMAGE_BONUS;  // default: 0.15
+    if (minLevel >= 5) return 0.15;
+    return 0.10;  // base synergy for any 2 towers
   }
 
   // ─── Map helpers ─────────────────────────────────────────────────────────────
@@ -1286,6 +1289,7 @@ export class Game {
       towersAt: (c, r) => this.towersAt(c, r),
       towerCost: (id) => this.towerCost(id),
       towerUpgradeCost: (t) => this.towerUpgradeCost(t),
+      getSynergyBonus: (t) => this.getSynergyBonus(t),
       gameSpeed: this.gameSpeed,
       debugMode: this.debugMode,
       pendingAffinity: this.pendingAffinity,

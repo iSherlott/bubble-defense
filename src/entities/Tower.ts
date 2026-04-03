@@ -8,11 +8,11 @@ export function resetTowerIds() { _nextTowerId = 1; }
 export class Tower {
   readonly id: number;
   readonly def: TowerDef;
-  readonly gridX: number;
-  readonly gridY: number;
-  readonly pixelX: number;
-  readonly pixelY: number;
-  readonly slotIndex: 0 | 1;  // 0 = left/first, 1 = right/second on same cell
+  gridX: number;
+  gridY: number;
+  pixelX: number;
+  pixelY: number;
+  slotIndex: 0 | 1;  // 0 = left/first, 1 = right/second on same cell
 
   // Upgrade system
   damageMult: number;    // starts 1.0, each upgrade to damage adds UPGRADE_MULT_STEP
@@ -26,7 +26,7 @@ export class Tower {
   goldSpent: number;     // total gold spent (place + upgrades)
 
   // Slot role
-  isSecondary: boolean;  // slot 1 tower: only fires magic
+  isSecondary: boolean;  // slot 1 tower on same cell
 
   // Fusion
   fusionDef: FusionDef | null;
@@ -162,6 +162,17 @@ export class Tower {
 
   magicBarRatio(): number {
     return this.magicBar / this.def.magicBarMax;
+  }
+
+  // ─── Move ───────────────────────────────────────────────────────────────────
+  /** Relocate this tower in-place, preserving id, cooldown, magicBar, etc. */
+  moveTo(gridX: number, gridY: number, slot: 0 | 1) {
+    this.gridX = gridX;
+    this.gridY = gridY;
+    this.slotIndex = slot;
+    const offsetX = slot === 0 ? -9 : 9;
+    this.pixelX = gridX * CELL_SIZE + CELL_SIZE / 2 + offsetX;
+    this.pixelY = gridY * CELL_SIZE + CELL_SIZE / 2;
   }
 
   // ─── Affinity ───────────────────────────────────────────────────────────────

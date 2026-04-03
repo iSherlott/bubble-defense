@@ -45,6 +45,7 @@ interface RenderState {
   towersAt: (c:number,r:number) => Tower[];
   towerCost: (id:string) => number;
   towerUpgradeCost: (t?:Tower) => number;
+  getSynergyBonus: (t:Tower) => number;
   gameSpeed: 1 | 2;
   debugMode: boolean;
   pendingAffinity: ElementType;
@@ -460,7 +461,7 @@ export class Renderer {
 
     // Upgrade popup
     if(g.upgradePopup)
-      this.renderUpgradePopup(ctx,g.upgradePopup,state.towersAt,state.towerCost,state.towerUpgradeCost,g.gold,g.canFuse);
+      this.renderUpgradePopup(ctx,g.upgradePopup,state.towersAt,state.towerCost,state.towerUpgradeCost,state.getSynergyBonus,g.gold,g.canFuse);
 
     // Item drop animation
     if(g.itemDropAnim) this.renderItemDropAnim(ctx,g.itemDropAnim);
@@ -1103,11 +1104,14 @@ export class Renderer {
     towersAt: (c:number,r:number)=>Tower[],
     towerCost: (id:string)=>number,
     towerUpgradeCost: (t?:Tower)=>number,
+    getSynergyBonus: (t:Tower)=>number,
     gold: number,
     canFuse: boolean = false,
   ){
     const here=towersAt(popup.col,popup.row);
-    const pw=252, towerH=60, actionH=26, headerH=34, add2H=60, closeH=28;
+    const hasSynergy=here.length>=2;
+    const synergyPct=hasSynergy?Math.round(getSynergyBonus(here[0])*100):0;
+    const pw=252, towerH=60, actionH=26, headerH=hasSynergy?48:34, add2H=60, closeH=28;
     const fusionH = canFuse ? 36 : 0;
     const towerRows=here.reduce((_,__)=>_+towerH+actionH+6,0);
     const ph=headerH + towerRows + (here.length<2 ? add2H : 0) + fusionH + closeH + 20;
@@ -1126,7 +1130,13 @@ export class Renderer {
     ctx.textAlign='left';
     let ry=py+10;
     ctx.fillStyle='#aaaaff'; ctx.font='bold 12px Segoe UI';
-    ctx.fillText(`📍 Célula (${popup.col},${popup.row})`,px+12,ry+12); ry+=headerH;
+    ctx.fillText(`📍 Célula (${popup.col},${popup.row})`,px+12,ry+12);
+    if(hasSynergy){
+      const synColor=synergyPct>=30?'#ffcc44':synergyPct>=20?'#aaddff':synergyPct>=15?'#88cc88':'#88aaaa';
+      ctx.fillStyle=synColor; ctx.font='bold 9px Segoe UI';
+      ctx.fillText(`⚡ Sinergia: +${synergyPct}% dano${here[0].fusionDef?' (fusão: dano duplo)':''}`,px+12,ry+26);
+    }
+    ry+=headerH;
 
     here.forEach((tower,i)=>{
       // Info row
@@ -1151,9 +1161,14 @@ export class Renderer {
       ctx.fillStyle='#777788'; ctx.font='8px Segoe UI';
       const dmgUps=tower.upgradeHistory.filter(h=>h==='damage').length;
       const spdUps=tower.upgradeHistory.filter(h=>h==='speed').length;
-      const fusionInfo=tower.fusionDef?` ${ELEMENT_ICONS[tower.fusionDef.primaryElement]}+${ELEMENT_ICONS[tower.fusionDef.secondaryElement]}`:'';
-      ctx.fillText(`Dmg×${tower.damageMult.toFixed(1)} Spd×${tower.speedMult.toFixed(1)}${tower.upgradeCount>0?` ⚔${dmgUps}⚡${spdUps}`:''}${fusionInfo}`,infoRect.x+27,infoRect.y+27);
-      ctx.fillText(`Venda: ${Math.floor(tower.goldSpent/2)}g | Mover: ${Math.round(tower.placedCost*CFG_MOVE_COST_MULT)}g`,infoRect.x+27,infoRect.y+39);
+      ctx.fillText(`Dmg×${tower.damageMult.toFixed(1)} Spd×${tower.speedMult.toFixed(1)}${tower.upgradeCount>0?` ⚔${dmgUps}⚡${spdUps}`:''}`,infoRect.x+27,infoRect.y+27);
+      if(tower.fusionDef){
+        const pe=tower.fusionDef.primaryElement, se=tower.fusionDef.secondaryElement;
+        ctx.fillStyle='#99aacc'; ctx.font='7px Segoe UI';
+        ctx.fillText(`Ataque: 50%${ELEMENT_ICONS[pe]}+50%${ELEMENT_ICONS[se]} | Magia: 60%${ELEMENT_ICONS[pe]}+40%${ELEMENT_ICONS[se]}`,infoRect.x+27,infoRect.y+39);
+      } else {
+        ctx.fillText(`Venda: ${Math.floor(tower.goldSpent/2)}g | Mover: ${Math.round(tower.placedCost*CFG_MOVE_COST_MULT)}g`,infoRect.x+27,infoRect.y+39);
+      }
       if(tower.dualMagic){ctx.fillStyle='#ffff44'; ctx.font='bold 7px Segoe UI'; ctx.fillText('✨DUAL',infoRect.x+pw-60,infoRect.y+15);}
 
       ry+=towerH;

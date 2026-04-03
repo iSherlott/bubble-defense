@@ -48,8 +48,8 @@ export const CFG_ENEMY_REWARD_SCALE         = 0.04; // +4% gold reward per wave
 export const CFG_ENEMY_XP_SCALE             = 0.03; // +3% XP reward per wave
 
 // ─── Wave composition ─────────────────────────────────────────────────────────
-export const CFG_WAVE_BASE_COUNT     = 6;    // enemies per type at wave 1
-export const CFG_WAVE_COUNT_PER_WAVE = 0.3;  // additional enemies per wave per type
+export const CFG_WAVE_BASE_COUNT     = 6;    // total enemies at wave 1 (divided among types)
+export const CFG_WAVE_COUNT_PER_WAVE = 0.5;  // additional enemies per wave (total, not per type)
 export const CFG_ELITE_START_WAVE    = 20;   // first wave with elite units
 export const CFG_ELITE_BASE_MULT     = 2;    // elite multiplier at start wave
 export const CFG_ELITE_MAX_MULT      = 10;   // elite multiplier cap

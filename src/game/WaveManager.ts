@@ -100,11 +100,12 @@ export class WaveManager {
         chosen.push(poolCopy.splice(idx, 1)[0]);
       }
 
-      // Base count per type (increases with wave)
-      const baseCount = Math.round(CFG_WAVE_BASE_COUNT + this.currentWave * CFG_WAVE_COUNT_PER_WAVE);
+      // Total enemy count for the wave (divided among types)
+      const totalCount = Math.round(CFG_WAVE_BASE_COUNT + this.currentWave * CFG_WAVE_COUNT_PER_WAVE);
+      const perType = Math.max(1, Math.round(totalCount / chosen.length));
 
       this.spawnQueues = chosen.map(typeId => ({
-        typeId, count: baseCount, timer: 0, spawned: 0, isBoss: false, isElite: false,
+        typeId, count: perType, timer: 0, spawned: 0, isBoss: false, isElite: false,
       }));
 
       // Elite units at wave 50+
@@ -150,7 +151,7 @@ export class WaveManager {
           e.pos = { x: waypoints[0]?.x ?? 0, y: waypoints[0]?.y ?? 0 };
           spawned.push(e);
           q.spawned++;
-          q.timer = 100 + Math.random() * 1900;
+          q.timer = 600 + Math.random() * 800;
         }
       }
     }
@@ -182,8 +183,8 @@ export class WaveManager {
       const idx = Math.floor(rng() * poolCopy.length);
       chosen.push(poolCopy.splice(idx, 1)[0]);
     }
-    const baseCount = Math.round(CFG_WAVE_BASE_COUNT + nextWave * CFG_WAVE_COUNT_PER_WAVE);
+    const totalCount = Math.round(CFG_WAVE_BASE_COUNT + nextWave * CFG_WAVE_COUNT_PER_WAVE);
     const elites = eliteCountForWave(nextWave);
-    return { types: chosen, isBoss: false, eliteCount: elites, enemyCount: baseCount * typeCount + elites };
+    return { types: chosen, isBoss: false, eliteCount: elites, enemyCount: totalCount + elites };
   }
 }
