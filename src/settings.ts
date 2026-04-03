@@ -28,7 +28,7 @@ export const CFG_INTEL_MAGIC_BONUS   = 0.10; // +% magic damage per intelligence
 export const CFG_AGILITY_FIRERATE    = 0.05; // +% fire rate per agility point
 export const CFG_LUCK_CRIT_CHANCE    = 0.01; // crit chance fraction per luck point
 export const CFG_LUCK_CRIT_MULT      = 0.10; // crit multiplier added per luck point (1 + luck×this)
-export const CFG_VITALITY_REGEN_PER_POINT = 0.10; // lives regenerated per wave per vitality point (floor)
+export const CFG_VITALITY_REGEN_PER_POINT = 0.25; // lives regenerated per wave per vitality point (floor)
 export const CFG_LUCK_GOLD_BONUS     = 0.02; // gold reward multiplier bonus per luck point
 
 // ─── Hit/miss ─────────────────────────────────────────────────────────────────
@@ -39,18 +39,30 @@ export const CFG_MAX_LEVEL          = 50;
 export const CFG_TALENT_POINT_EVERY = 10;  // gain 1 talent point per N levels
 
 // ─── Enemy scaling ────────────────────────────────────────────────────────────
-export const CFG_ENEMY_HP_SCALE_PER_WAVE    = 0.10; // +10% HP per wave (multiplier = 1 + (wave-1)×this)
-export const CFG_ENEMY_SPEED_SCALE_PER_WAVE = 0.05; // +5% speed per wave
-export const CFG_ENEMY_AGILITY_SCALE        = 0.05; // +5% agility per wave
+export const CFG_ENEMY_HP_SCALE_PER_WAVE    = 0.10; // +10% HP per wave (linear part)
+export const CFG_ENEMY_HP_COMPOUND_RATE     = 0.03; // 3% compound HP growth after threshold
+export const CFG_ENEMY_HP_COMPOUND_START    = 10;   // wave where compound scaling begins
+export const CFG_ENEMY_SPEED_SCALE_PER_WAVE = 0.02; // +2% speed per wave
+export const CFG_ENEMY_AGILITY_SCALE        = 0.03; // +3% agility per wave
+export const CFG_ENEMY_REWARD_SCALE         = 0.04; // +4% gold reward per wave
+export const CFG_ENEMY_XP_SCALE             = 0.03; // +3% XP reward per wave
 
 // ─── Wave composition ─────────────────────────────────────────────────────────
 export const CFG_WAVE_BASE_COUNT     = 6;    // enemies per type at wave 1
 export const CFG_WAVE_COUNT_PER_WAVE = 0.5;  // additional enemies per wave per type
-export const CFG_ELITE_START_WAVE    = 50;   // first wave with elite units
-export const CFG_ELITE_MULT          = 10;   // elite HP/speed/agility multiplier vs normal
+export const CFG_ELITE_START_WAVE    = 20;   // first wave with elite units
+export const CFG_ELITE_BASE_MULT     = 2;    // elite multiplier at start wave
+export const CFG_ELITE_MAX_MULT      = 10;   // elite multiplier cap
+export const CFG_ELITE_SCALE_WAVES   = 30;   // waves to go from base to max mult
+
+// ─── Tower movement ──────────────────────────────────────────────────────────
+export const CFG_MOVE_COST_MULT      = 0.5;  // move cost = placedCost × this
+
+// ─── Synergy ───────────────────────────────────────────────────────────────
+export const CFG_SYNERGY_DAMAGE_BONUS = 0.15; // +15% damage when 2 towers share a cell
 
 // ─── Golem special abilities ──────────────────────────────────────────────────
-export const CFG_FIRE_GOLEM_REGEN_PER_DMG = 0.0001; // HP% healed per damage point taken
+export const CFG_FIRE_GOLEM_REGEN_PER_HIT  = 0.003; // 0.3% of maxHP healed per damage event
 export const CFG_WATER_GOLEM_PUDDLE_REGEN = 0.0001; // HP%/s healed while inside puddle
 export const CFG_EARTH_GOLEM_SHIELD_RADIUS = 80;    // px radius for damage absorption
 export const CFG_WIND_GOLEM_PUSH_IMMUNE    = true;  // immune to wind push

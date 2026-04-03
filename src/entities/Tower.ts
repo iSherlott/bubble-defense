@@ -1,4 +1,4 @@
-import type { TowerDef, ElementType, Stats } from '../types';
+import type { TowerDef, ElementType, Stats, FusionDef } from '../types';
 import type { Enemy } from './Enemy';
 import { CELL_SIZE, OPPOSITE_ELEMENT, MAX_TOWER_LEVEL } from '../constants';
 
@@ -28,6 +28,9 @@ export class Tower {
   // Slot role
   isSecondary: boolean;  // slot 1 tower: only fires magic
 
+  // Fusion
+  fusionDef: FusionDef | null;
+
   // State
   cooldown: number;
   magicBar: number;
@@ -55,6 +58,8 @@ export class Tower {
     this.placedCost  = def.baseCost;
     this.goldSpent   = def.baseCost;
     this.isSecondary = slotIndex === 1;
+
+    this.fusionDef = null;
 
     this.cooldown = 0;
     this.magicBar = 0;

@@ -1,14 +1,17 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle } from '../types';
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDef, ItemDropAnim } from '../types';
 import { TOWER_DEFS, CELL_SIZE, ELEMENT_COLORS,
   BASE_LIVES, INITIAL_GOLD, BASE_TOWER_COST,
   UPGRADE_MULT_STEP, DUAL_MAGIC_BASE_CHANCE, DUAL_MAGIC_LUCK_BONUS,
-  MAP_TIER_AT, MAX_TOWER_LEVEL, MAP_EXPAND_COST } from '../constants';
+  MAP_TIER_AT, MAX_TOWER_LEVEL, MAP_EXPAND_COST,
+  getFusionDef, ITEM_DEFS, ITEM_RARITY_COLORS, ARCHETYPE_DEFS } from '../constants';
 import {
   CFG_EARTH_AOE_RADIUS, CFG_PUDDLE_RADIUS, CFG_PUDDLE_DURATION,
   CFG_WIND_PUSH_CELLS, CFG_BURN_PCT_PER_SEC, CFG_BURN_DURATION,
   CFG_PUDDLE_SLOW_AMOUNT, CFG_WATER_PUDDLE_CHANCE,
-  CFG_FIRE_GOLEM_REGEN_PER_DMG, CFG_WATER_GOLEM_PUDDLE_REGEN,
+  CFG_WATER_GOLEM_PUDDLE_REGEN,
   CFG_EARTH_GOLEM_SHIELD_RADIUS,
+  CFG_ENEMY_REWARD_SCALE, CFG_ENEMY_XP_SCALE,
+  CFG_MOVE_COST_MULT, CFG_SYNERGY_DAMAGE_BONUS,
 } from '../settings';
 import { Tower, resetTowerIds } from '../entities/Tower';
 import { Enemy } from '../entities/Enemy';
@@ -40,6 +43,9 @@ export class Game {
   screen: GameScreen = 'menu';
   paused = false;
   autoWave = false;   // automatically start next wave
+  gameSpeed: 1 | 2 = 1;
+  debugMode = false;
+  pendingAffinity: ElementType = 'fire';  // stored between affinity→archetype screens
 
   gold   = INITIAL_GOLD;
   lives  = BASE_LIVES;
@@ -64,6 +70,11 @@ export class Game {
   mousePos: Vec2 = { x: 0, y: 0 };
   upgradePopup: UpgradePopup | null = null;
   movingTower: Tower | null = null;
+
+  // Item system
+  items: OwnedItem[] = [];
+  itemDropAnim: ItemDropAnim | null = null;
+  private lastItemWave = 0;  // track which wave last gave item
 
   private lastTime = 0;
   private currentMapSeed = 1;
@@ -103,11 +114,12 @@ export class Game {
   private onClick(e: MouseEvent) {
     const p = this.cvPos(e);
     switch (this.screen) {
-      case 'menu':     this.handleMenuClick(p); break;
-      case 'affinity': this.handleAffinityClick(p); break;
-      case 'game':     this.handleGameClick(p); break;
-      case 'levelup':  this.handleLevelUpClick(p); break;
-      case 'talent':   this.handleTalentClick(p); break;
+      case 'menu':      this.handleMenuClick(p); break;
+      case 'affinity':  this.handleAffinityClick(p); break;
+      case 'archetype': this.handleArchetypeClick(p); break;
+      case 'game':      this.handleGameClick(p); break;
+      case 'levelup':   this.handleLevelUpClick(p); break;
+      case 'talent':    this.handleTalentClick(p); break;
       case 'gameover':  this.handleGameOverClick(p); break;
       case 'bestiary':  this.handleBestiaryClick(p); break;
     }
@@ -129,6 +141,9 @@ export class Game {
       }
     }
     if ((e.key === 'p' || e.key === 'P') && this.screen === 'game') this.paused = !this.paused;
+    if ((e.key === 'a' || e.key === 'A') && this.screen === 'game') this.autoWave = !this.autoWave;
+    if ((e.key === 'e' || e.key === 'E') && this.screen === 'game') this.expandMap();
+    if (e.key === 'F12') { e.preventDefault(); this.debugMode = !this.debugMode; }
   }
 
   private px2grid(p: Vec2): Vec2 {
@@ -148,8 +163,21 @@ export class Game {
 
   private handleAffinityClick(p: Vec2) {
     for (const [el, r] of this.renderer.getAffinityRects()) {
-      if (this.hit(p, r)) { this.startNewGame(el as ElementType); return; }
+      if (this.hit(p, r)) { this.pendingAffinity = el as ElementType; this.screen = 'archetype' as GameScreen; return; }
     }
+  }
+
+  private handleArchetypeClick(p: Vec2) {
+    const rects = this.renderer.getArchetypeRects();
+    for (const [id, r] of rects) {
+      if (this.hit(p, r)) {
+        this.startNewGame(this.pendingAffinity, id);
+        return;
+      }
+    }
+    // Back button
+    const back = this.renderer.getArchetypeBackRect();
+    if (back && this.hit(p, back)) { this.screen = 'affinity'; return; }
   }
 
   private handleGameOverClick(p: Vec2) {
@@ -197,11 +225,13 @@ export class Game {
         const k = `upgrade_${i}`;
         if (btns[k] && this.hit(p, btns[k])) {
           const here = this.towersAt(this.upgradePopup.col, this.upgradePopup.row);
-          const upgCost = this.towerUpgradeCost();
-          if (here[i] && this.gold >= upgCost && !here[i].isMaxLevel) {
-            this.gold -= upgCost;
-            here[i].goldSpent += upgCost;
-            this.upgradeTower(here[i]);
+          if (here[i]) {
+            const upgCost = this.towerUpgradeCost(here[i]);
+            if (this.gold >= upgCost && !here[i].isMaxLevel) {
+              this.gold -= upgCost;
+              here[i].goldSpent += upgCost;
+              this.upgradeTower(here[i]);
+            }
           }
           return;
         }
@@ -236,18 +266,34 @@ export class Game {
         }
       }
 
+      // Fusion button
+      if (btns['fusion'] && this.hit(p, btns['fusion'])) {
+        this.fuseTowers(this.upgradePopup.col, this.upgradePopup.row);
+        this.upgradePopup = null; return;
+      }
+
       if (!this.hit(p, this.renderer.getUpgradePopupRect())) this.upgradePopup = null;
       return;
     }
 
+    // ── Debug panel (absorbs clicks when open) ──
+    if (this.debugMode) {
+      const dbg = this.renderer.getDebugBtns();
+      for (const [cmd, r] of Object.entries(dbg)) {
+        if (this.hit(p, r)) { this.handleDebugClick(cmd); return; }
+      }
+    }
+
     // ── Sidebar ──
     const ui = this.renderer.getGameUIRects();
-    if (ui['pause']     && this.hit(p, ui['pause']))     { this.paused = !this.paused; return; }
-    if (ui['nextWave']  && this.hit(p, ui['nextWave']))  {
-      if (this.waveManager.betweenWaves) this.waveManager.startWave();
+    if (ui['mainAction'] && this.hit(p, ui['mainAction'])) {
+      if (this.paused) { this.paused = false; }
+      else if (this.waveManager.waveActive) { this.paused = true; }
+      else if (this.waveManager.betweenWaves) { this.waveManager.startWave(); }
       return;
     }
     if (ui['autoWave']  && this.hit(p, ui['autoWave']))  { this.autoWave = !this.autoWave; return; }
+    if (ui['speedToggle'] && this.hit(p, ui['speedToggle'])) { this.gameSpeed = this.gameSpeed === 1 ? 2 : 1; return; }
     if (ui['talentBtn'] && this.hit(p, ui['talentBtn'])) { this.screen = 'talent'; return; }
     if (ui['expandMap']  && this.hit(p, ui['expandMap']))  { this.expandMap(); return; }
     if (ui['bestiary']   && this.hit(p, ui['bestiary']))   { this.screen = 'bestiary'; return; }
@@ -296,19 +342,19 @@ export class Game {
     return this.towers.filter(t => t.gridX === col && t.gridY === row);
   }
 
-  /** Cost = baseCost × (count of that type already placed + 1) */
+  /** Cost = baseCost × (count of that type already placed + 1), minus item discount */
   towerCost(typeId: string): number {
     const count = this.towers.filter(t => t.def.id === typeId).length;
     const def = TOWER_DEFS.find(d => d.id === typeId)!;
-    return def.baseCost * (count + 1);
+    const base = def.baseCost * (count + 1);
+    return Math.max(1, Math.round(base * (1 - this.getItemDiscount())));
   }
 
-  /** Dynamic upgrade cost: sum(baseCosts) × tier / 10 − max(0, 20-lives) */
-  towerUpgradeCost(): number {
-    const sumBase = this.towers.reduce((s, t) => s + t.def.baseCost, 0);
-    const tier = this.currentMapTier + 1;
-    const livesBonus = Math.max(0, BASE_LIVES - this.lives);
-    return Math.max(50, Math.round(sumBase * tier / 10) - livesBonus);
+  /** Per-tower upgrade cost: baseCost × (1 + upgradeCount × 0.3), minus item discount */
+  towerUpgradeCost(tower?: Tower): number {
+    if (!tower) return 50; // fallback
+    const base = Math.round(tower.def.baseCost * (1 + tower.upgradeCount * 0.3));
+    return Math.max(1, Math.round(base * (1 - this.getItemDiscount())));
   }
 
   private placeTower(col: number, row: number, slot: 0 | 1) {
@@ -342,7 +388,7 @@ export class Game {
     const sameCell = col === tower.gridX && row === tower.gridY;
     const maxSlot = tower.slotIndex === 1 ? 0 : 1;  // same-cell slot check
     if (!sameCell && here.length >= 2) return;
-    const moveCost = tower.placedCost * 2;
+    const moveCost = Math.round(tower.placedCost * CFG_MOVE_COST_MULT);
     if (this.gold < moveCost) {
       this.addFT({ x: tower.pixelX, y: tower.pixelY }, `Sem ouro (${moveCost}g)`, '#ff6666');
       return;
@@ -358,6 +404,7 @@ export class Game {
     newTower.placedCost    = tower.placedCost;
     newTower.goldSpent     = tower.goldSpent;
     newTower.isSecondary   = tower.isSecondary;
+    newTower.fusionDef     = tower.fusionDef;
     newTower.totalDamageDealt = tower.totalDamageDealt;
     newTower.totalKills    = tower.totalKills;
     this.towers = this.towers.filter(t => t.id !== tower.id);
@@ -406,6 +453,120 @@ export class Game {
     }
   }
 
+  // ─── Fusion System ──────────────────────────────────────────────────────────
+  /** Check if a cell with 2 max-level towers can fuse */
+  canFuse(col: number, row: number): boolean {
+    const here = this.towersAt(col, row);
+    if (here.length !== 2) return false;
+    const primary = here.find(t => !t.isSecondary);
+    const secondary = here.find(t => t.isSecondary);
+    if (!primary || !secondary) return false;
+    if (!primary.isMaxLevel || !secondary.isMaxLevel) return false;
+    if (primary.fusionDef) return false; // already fused
+    return !!getFusionDef(primary.def.element, secondary.def.element);
+  }
+
+  /** Perform fusion on a cell */
+  fuseTowers(col: number, row: number) {
+    if (!this.canFuse(col, row)) return;
+    const here = this.towersAt(col, row);
+    const primary = here.find(t => !t.isSecondary)!;
+    const secondary = here.find(t => t.isSecondary)!;
+    const fusion = getFusionDef(primary.def.element, secondary.def.element);
+    if (!fusion) return;
+
+    // Remove secondary tower, apply fusion to primary
+    this.towers = this.towers.filter(t => t.id !== secondary.id);
+    primary.fusionDef = fusion;
+    primary.isSecondary = false;
+
+    this.addFT(
+      { x: primary.pixelX, y: primary.pixelY - 30 },
+      `${fusion.icon} FUSÃO: ${fusion.name}!`, fusion.color
+    );
+    this.addFT(
+      { x: primary.pixelX, y: primary.pixelY - 50 },
+      fusion.description, '#ddddff'
+    );
+  }
+
+  // ─── Item System ────────────────────────────────────────────────────────────
+  /** Roll for an item drop (called every 10 waves) */
+  private rollItemDrop() {
+    const roll = Math.random();
+    let pool: ItemDef[];
+    if (roll < 0.05) {
+      pool = ITEM_DEFS.filter(i => i.rarity === 'legendary');
+    } else if (roll < 0.25) {
+      pool = ITEM_DEFS.filter(i => i.rarity === 'rare');
+    } else {
+      pool = ITEM_DEFS.filter(i => i.rarity === 'common');
+    }
+    const item = pool[Math.floor(Math.random() * pool.length)];
+    this.addItem(item);
+  }
+
+  private addItem(item: ItemDef) {
+    const existing = this.items.find(i => i.defId === item.id);
+    if (existing) {
+      if (existing.stacks < 3) {
+        existing.stacks++;
+      } else {
+        // Already at max stacks, reroll once
+        const alt = ITEM_DEFS.filter(i => i.rarity === item.rarity && i.id !== item.id);
+        if (alt.length > 0) {
+          const other = alt[Math.floor(Math.random() * alt.length)];
+          const otherExisting = this.items.find(i => i.defId === other.id);
+          if (otherExisting && otherExisting.stacks < 3) otherExisting.stacks++;
+          else if (!otherExisting) this.items.push({ defId: other.id, stacks: 1 });
+          this.itemDropAnim = { item: other, phase: 'rising', timer: 0, totalTime: 2.5 };
+          return;
+        }
+        return; // all maxed
+      }
+    } else {
+      this.items.push({ defId: item.id, stacks: 1 });
+    }
+    this.itemDropAnim = { item, phase: 'rising', timer: 0, totalTime: 2.5 };
+  }
+
+  /** Total bonus gold per kill from items */
+  getItemGoldBonus(): number {
+    let bonus = 0;
+    for (const owned of this.items) {
+      const def = ITEM_DEFS.find(d => d.id === owned.defId);
+      if (def && def.effectType === 'gold_mult') bonus += def.effectValue * owned.stacks;
+    }
+    return bonus;
+  }
+
+  /** Total discount fraction from items (capped at 0.9) */
+  getItemDiscount(): number {
+    let disc = 0;
+    for (const owned of this.items) {
+      const def = ITEM_DEFS.find(d => d.id === owned.defId);
+      if (def && def.effectType === 'discount') disc += def.effectValue * owned.stacks;
+    }
+    return Math.min(0.9, disc);
+  }
+
+  /** Total slow aura seconds from items */
+  getItemSlowAura(): number {
+    let slow = 0;
+    for (const owned of this.items) {
+      const def = ITEM_DEFS.find(d => d.id === owned.defId);
+      if (def && def.effectType === 'slow_aura') slow += def.effectValue * owned.stacks;
+    }
+    return slow;
+  }
+
+  /** Synergy bonus: +15% damage when 2 towers share a cell (before fusion) */
+  getSynergyBonus(tower: Tower): number {
+    const here = this.towersAt(tower.gridX, tower.gridY);
+    if (here.length >= 2) return CFG_SYNERGY_DAMAGE_BONUS;
+    return 0;
+  }
+
   // ─── Map helpers ─────────────────────────────────────────────────────────────
   private regenerateMap(tier: number, seed: number) {
     this.currentMapTier = tier;
@@ -421,6 +582,7 @@ export class Game {
     this.gold  = INITIAL_GOLD; this.lives = BASE_LIVES; this.score = 0;
     this.towers = []; this.enemies = []; this.projectiles = [];
     this.floatingTexts = []; this.puddles = [];
+    this.items = []; this.itemDropAnim = null; this.lastItemWave = 0;
     this.talentTree  = new TalentTree();
     this.waveManager = new WaveManager();
     this.upgradePopup = null; this.paused = false; this.autoWave = false;
@@ -429,10 +591,10 @@ export class Game {
     resetTowerIds(); resetProjectileIds();
   }
 
-  startNewGame(affinity: ElementType) {
+  startNewGame(affinity: ElementType, archetypeId: string) {
     this.player = new Player();
     this.player.affinity = affinity;
-    this.player.generateStartingStats();
+    this.player.applyArchetype(archetypeId);
     this.initState();
     const seed = Date.now() & 0xffffff;
     this.regenerateMap(0, seed);
@@ -467,8 +629,19 @@ export class Game {
       tower.placedCost    = t.placedCost ?? def.baseCost;
       tower.goldSpent     = t.goldSpent  ?? def.baseCost;
       tower.isSecondary   = t.isSecondary ?? (t.slotIndex === 1);
+      if (t.fusionId) {
+        const [pe, se] = t.fusionId.split('+');
+        tower.fusionDef = getFusionDef(pe, se) ?? null;
+      }
       this.towers.push(tower);
     }
+
+    // Restore items
+    if (data.game.items) {
+      this.items = data.game.items.map(i => ({ defId: i.defId, stacks: i.stacks }));
+    }
+    this.lastItemWave = Math.floor(data.game.wave / 10) * 10;
+
     this.screen = 'game';
   }
 
@@ -480,6 +653,7 @@ export class Game {
         gold: this.gold, lives: this.lives,
         wave: this.waveManager.currentWave, score: this.score,
         mapSeed: this.currentMapSeed,
+        items: this.items.map(i => ({ defId: i.defId, stacks: i.stacks })),
         towers: this.towers.map(t => ({
           typeId: t.def.id, gridX: t.gridX, gridY: t.gridY,
           slotIndex: t.slotIndex, damageMult: t.damageMult,
@@ -487,6 +661,7 @@ export class Game {
           upgradeHistory: t.upgradeHistory, dualMagic: t.dualMagic,
           placedCost: t.placedCost, goldSpent: t.goldSpent,
           isSecondary: t.isSecondary,
+          fusionId: t.fusionDef?.id,
         })),
       },
       timestamp: Date.now(),
@@ -497,9 +672,12 @@ export class Game {
   start() { this.lastTime = performance.now(); requestAnimationFrame(this.loop); }
 
   private loop = (now: number) => {
-    const dt = Math.min((now - this.lastTime) / 1000, 0.05);
+    const rawDt = Math.min((now - this.lastTime) / 1000, 0.05);
     this.lastTime = now;
-    if (this.screen === 'game' && !this.paused) this.update(dt);
+    if (this.screen === 'game' && !this.paused) {
+      const dt = rawDt * this.gameSpeed;
+      this.update(dt);
+    }
     this.render();
     requestAnimationFrame(this.loop);
   };
@@ -508,13 +686,19 @@ export class Game {
   private update(dt: number) {
     const { waypoints, totalLength, pathCells, gameWidth, gameHeight } = this.map;
 
-    // Wave just completed → vitality life regen
+    // Wave just completed → vitality life regen + item drop every 10 waves
     if (this.waveManager.waveComplete) {
       this.waveManager.waveComplete = false;  // consume the flag
       const regen = Math.floor(this.player.stats.vitality * 0.1);
       if (regen > 0) {
         this.lives = Math.min(BASE_LIVES, this.lives + regen);
         this.addFT({ x: this.map.gameWidth / 2, y: this.map.gameHeight / 2 }, `+${regen}❤ Vitalidade`, '#ff8888');
+      }
+      // Item drop every 10 waves
+      const completedWave = this.waveManager.currentWave;
+      if (completedWave > 0 && completedWave % 10 === 0 && completedWave !== this.lastItemWave) {
+        this.lastItemWave = completedWave;
+        this.rollItemDrop();
       }
     }
 
@@ -531,6 +715,11 @@ export class Game {
 
     // Spawn enemies (WaveManager also calls enemy.update internally)
     const newEnemies = this.waveManager.update(dt, this.enemies, waypoints, totalLength);
+    // Apply item slow aura to newly spawned enemies
+    const slowAura = this.getItemSlowAura();
+    if (slowAura > 0) {
+      for (const e of newEnemies) e.applyTempSlow(0.15, slowAura);
+    }
     this.enemies.push(...newEnemies);
 
     // Enemy end-of-path check
@@ -579,7 +768,8 @@ export class Game {
       if (!target) continue;
 
       const dmgB     = this.talentTree.damageBonusForElement(tower.def.element);
-      const baseDmg  = tower.getDamage(this.player.stats, dmgB, affM);
+      const synergy  = this.getSynergyBonus(tower);
+      const baseDmg  = tower.getDamage(this.player.stats, dmgB + synergy, affM);
 
       const didHit   = Math.random() <= this.player.hitChance(target.agility);
       const isCrit   = didHit && Math.random() < this.player.critChance();
@@ -632,20 +822,38 @@ export class Game {
     for (const e of killed) {
       this.waveManager.enemiesKilledThisWave++;
       if (!e.reachedEnd) {  // no gold for enemies that pass through
-        const g = Math.round(e.def.reward * this.player.goldMultiplier());
+        const rewardMult = 1 + (this.waveManager.currentWave - 1) * CFG_ENEMY_REWARD_SCALE;
+        const g = Math.round(e.def.reward * rewardMult * this.player.goldMultiplier()) + this.getItemGoldBonus();
         this.gold += g; this.score += g;
         this.addFT(e.pos, `+${g}g`, '#ffdd44');
       }
-      if (this.player.addXp(e.def.xp)) this.screen = 'levelup';
+      const xpMult = 1 + (this.waveManager.currentWave - 1) * CFG_ENEMY_XP_SCALE;
+      if (this.player.addXp(Math.round(e.def.xp * xpMult))) this.screen = 'levelup';
     }
 
     // Floating texts
     for (const f of this.floatingTexts) { f.y -= 40 * dt; f.life -= dt; }
     this.floatingTexts = this.floatingTexts.filter(f => f.life > 0);
+
+    // Item drop animation
+    if (this.itemDropAnim) {
+      this.itemDropAnim.timer += dt;
+      const t = this.itemDropAnim.timer;
+      if (t < 0.6) this.itemDropAnim.phase = 'rising';
+      else if (t < 2.0) this.itemDropAnim.phase = 'showing';
+      else this.itemDropAnim.phase = 'fading';
+      if (t >= this.itemDropAnim.totalTime) this.itemDropAnim = null;
+    }
   }
 
   // ─── Magic ───────────────────────────────────────────────────────────────────
   private fireMagic(tower: Tower, affM: number, extra: ProjectileData[]) {
+    // Fused tower: use fusion magic
+    if (tower.fusionDef) {
+      this.fireFusionMagic(tower, affM, extra);
+      return;
+    }
+
     const dmg = tower.getMagicDamage(this.player.stats, affM);
     const burnOnMag = tower.def.element === 'fire' && this.talentTree.fireBurnOnMagic();
 
@@ -688,6 +896,126 @@ export class Game {
         break;
       }
     }
+  }
+
+  /** Fire fusion magic — enhanced version based on fusion type */
+  private fireFusionMagic(tower: Tower, affM: number, extra: ProjectileData[]) {
+    const fusion = tower.fusionDef!;
+    const baseDmg = tower.getMagicDamage(this.player.stats, affM) * fusion.magicDamageMult;
+
+    // All fusion magics target enemies in range
+    const targets = tower.findAllInRange(this.enemies);
+    if (targets.length === 0) return;
+    const primary = targets[0];
+
+    switch (fusion.specialEffect) {
+      case 'magma_pool':
+      case 'fireball_aoe':
+      case 'sandstorm':
+      case 'tornado': {
+        // AoE damage to all in range
+        for (const t of targets) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: fusion.primaryElement,
+            color: fusion.color, isMagic: true, burnFromMagic: fusion.specialEffect === 'fireball_aoe' || fusion.specialEffect === 'magma_pool',
+          }));
+        }
+        this.renderer.triggerAoe(primary.pos.x, primary.pos.y, tower.getRange() * 0.6);
+        break;
+      }
+      case 'inferno': {
+        // Single target but massive burn
+        extra.push(createProjectile({
+          towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+          targetEnemyId: primary.id, damage: baseDmg, element: 'fire',
+          color: fusion.color, isMagic: true, burnFromMagic: true,
+        }));
+        break;
+      }
+      case 'steam':
+      case 'geyser': {
+        // Hit + stun
+        for (const t of targets.slice(0, 3)) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: fusion.primaryElement,
+            color: fusion.color, isMagic: true,
+          }));
+          t.stunRemaining = Math.max(t.stunRemaining, 1.5);
+        }
+        break;
+      }
+      case 'swamp':
+      case 'mud': {
+        // AoE slow + damage
+        for (const t of targets) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: fusion.primaryElement,
+            color: fusion.color, isMagic: true,
+          }));
+          t.addPermanentSlow();
+          t.addPermanentSlow();
+        }
+        // Create puddle
+        this.puddles.push({
+          x: primary.pos.x, y: primary.pos.y,
+          radius: PUDDLE_RADIUS * 1.5, remaining: PUDDLE_DURATION * 1.5,
+          slowAmount: CFG_PUDDLE_SLOW_AMOUNT * 2,
+        });
+        break;
+      }
+      case 'blizzard': {
+        // AoE freeze (stun + slow)
+        for (const t of targets) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: 'water',
+            color: fusion.color, isMagic: true,
+          }));
+          t.stunRemaining = Math.max(t.stunRemaining, 1.0);
+          t.addPermanentSlow();
+        }
+        this.renderer.triggerAoe(primary.pos.x, primary.pos.y, tower.getRange() * 0.5);
+        break;
+      }
+      case 'lightning': {
+        // Chain lightning: hits up to 5 targets
+        for (const t of targets.slice(0, 5)) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: 'wind',
+            color: fusion.color, isMagic: true,
+          }));
+        }
+        break;
+      }
+      case 'tsunami': {
+        // Push all enemies + damage
+        for (const t of targets) {
+          extra.push(createProjectile({
+            towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+            targetEnemyId: t.id, damage: baseDmg, element: 'wind',
+            color: fusion.color, isMagic: true,
+          }));
+          if (t.def.golemType !== 'wind') {
+            t.distanceTraveled = Math.max(0, t.distanceTraveled - WIND_PUSH_PX * 2);
+          }
+        }
+        break;
+      }
+      default: {
+        // Fallback: single target
+        extra.push(createProjectile({
+          towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
+          targetEnemyId: primary.id, damage: baseDmg, element: fusion.primaryElement,
+          color: fusion.color, isMagic: true,
+        }));
+      }
+    }
+
+    this.addFT({ x: tower.pixelX, y: tower.pixelY - 20 }, `${fusion.icon} ${fusion.name}`, fusion.color);
   }
 
   // ─── Hit Resolution ──────────────────────────────────────────────────────────
@@ -788,12 +1116,107 @@ export class Game {
         upgradePopup: this.upgradePopup,
         movingTower: this.movingTower,
         currentMapTier: this.currentMapTier,
+        items: this.items,
+        itemDropAnim: this.itemDropAnim,
+        canFuse: this.upgradePopup ? this.canFuse(this.upgradePopup.col, this.upgradePopup.row) : false,
       },
       player: this.player,
       talentTree: this.talentTree,
       towersAt: (c, r) => this.towersAt(c, r),
       towerCost: (id) => this.towerCost(id),
-      towerUpgradeCost: () => this.towerUpgradeCost(),
+      towerUpgradeCost: (t) => this.towerUpgradeCost(t),
+      gameSpeed: this.gameSpeed,
+      debugMode: this.debugMode,
+      pendingAffinity: this.pendingAffinity,
     });
+  }
+
+  // ─── Debug Commands ─────────────────────────────────────────────────────────
+  handleDebugClick(cmd: string) {
+    if (!this.debugMode) return;
+    switch (cmd) {
+      case 'gold_1000':  this.gold += 1000; break;
+      case 'gold_10000': this.gold += 10000; break;
+      case 'levelup': {
+        if (this.player.level < 50) {
+          this.player.xp = 0;
+          this.player.level++;
+          if (this.player.level % 10 === 0) this.player.talentPoints++;
+          this.screen = 'levelup';
+        }
+        break;
+      }
+      case 'levelup10': {
+        for (let i = 0; i < 10 && this.player.level < 50; i++) {
+          this.player.level++;
+          if (this.player.level % 10 === 0) this.player.talentPoints++;
+          // Auto-pick a random stat to avoid 10 level-up screens
+          const keys: Array<'strength'|'intelligence'|'dexterity'|'agility'|'luck'|'vitality'> =
+            ['strength','intelligence','dexterity','agility','luck','vitality'];
+          this.player.stats[keys[Math.floor(Math.random() * keys.length)]]++;
+        }
+        this.player.xp = 0;
+        break;
+      }
+      case 'maxlevel': {
+        while (this.player.level < 50) {
+          this.player.level++;
+          if (this.player.level % 10 === 0) this.player.talentPoints++;
+          const keys: Array<'strength'|'intelligence'|'dexterity'|'agility'|'luck'|'vitality'> =
+            ['strength','intelligence','dexterity','agility','luck','vitality'];
+          this.player.stats[keys[Math.floor(Math.random() * keys.length)]]++;
+        }
+        this.player.xp = 0;
+        break;
+      }
+      case 'heal':       this.lives = BASE_LIVES; break;
+      case 'kill_all': {
+        for (const e of this.enemies) {
+          if (!e.dead) {
+            e.dead = true;
+            this.waveManager.enemiesKilledThisWave++;
+            const rewardM = 1 + (this.waveManager.currentWave - 1) * CFG_ENEMY_REWARD_SCALE;
+            const g = Math.round(e.def.reward * rewardM * this.player.goldMultiplier()) + this.getItemGoldBonus();
+            this.gold += g; this.score += g;
+          }
+        }
+        this.enemies = [];
+        break;
+      }
+      case 'skip_wave':  {
+        // Kill all current enemies and force wave complete
+        for (const e of this.enemies) e.dead = true;
+        this.enemies = [];
+        this.waveManager.spawnQueues = [];
+        this.waveManager.waveActive = false;
+        this.waveManager.waveComplete = true;
+        this.waveManager.betweenWaves = true;
+        break;
+      }
+      case 'skip10': {
+        for (let i = 0; i < 10; i++) {
+          this.waveManager.currentWave++;
+        }
+        this.waveManager.waveActive = false;
+        this.waveManager.waveComplete = true;
+        this.waveManager.betweenWaves = true;
+        this.enemies = [];
+        break;
+      }
+      case 'give_item':  this.rollItemDrop(); break;
+      case 'max_towers': {
+        for (const t of this.towers) {
+          while (!t.isMaxLevel) {
+            const stat: 'damage'|'speed' = Math.random() < 0.5 ? 'damage' : 'speed';
+            if (stat === 'damage') t.damageMult += 0.1;
+            else t.speedMult += 0.1;
+            t.upgradeCount++;
+            t.upgradeHistory.push(stat);
+          }
+        }
+        break;
+      }
+      case 'god_mode':   this.lives = 9999; break;
+    }
   }
 }

@@ -1,6 +1,6 @@
-import type { Stats, StatKey, ElementType } from '../types';
+import type { Stats, StatKey, ElementType, ArchetypeDef } from '../types';
 import { XP_TABLE, MAX_LEVEL, TALENT_POINT_EVERY,
-  MIN_STAT_VALUE, STARTING_STAT_TOTAL } from '../constants';
+  MIN_STAT_VALUE, STARTING_STAT_TOTAL, ARCHETYPE_DEFS } from '../constants';
 import {
   CFG_STRENGTH_DMG_BONUS, CFG_INTEL_MAGIC_BONUS, CFG_AGILITY_FIRERATE,
   CFG_LUCK_CRIT_CHANCE, CFG_LUCK_CRIT_MULT, CFG_LUCK_GOLD_BONUS,
@@ -14,6 +14,8 @@ export class Player {
   talentPoints: number;
   affinity: ElementType;
   pendingLevelUp: boolean;
+  archetypeId: string;
+  bonusPoints: number;  // remaining manual distribution points
 
   constructor() {
     this.level = 0;
@@ -21,6 +23,8 @@ export class Player {
     this.talentPoints = 0;
     this.affinity = 'fire';
     this.pendingLevelUp = false;
+    this.archetypeId = '';
+    this.bonusPoints = 0;
     this.stats = this.defaultStats();
   }
 
@@ -30,16 +34,35 @@ export class Player {
 
   // ─── Starting Stat Generation ─────────────────────────────────────────────
   /**
-   * Generates 50 random stat points with minimum MIN_STAT_VALUE per stat.
-   * Called when starting a new game after affinity choice.
+   * Applies archetype base stats + sets bonus points for manual distribution.
+   * Total = archetype base (45 pts) + 5 bonus pts the player can distribute.
+   */
+  applyArchetype(archetypeId: string): void {
+    const arch = ARCHETYPE_DEFS.find(a => a.id === archetypeId);
+    if (!arch) return;
+    this.archetypeId = archetypeId;
+    this.stats = { ...arch.baseStats };
+    // Sum of base stats is ~45; remaining up to STARTING_STAT_TOTAL goes to bonusPoints
+    const baseSum = Object.values(arch.baseStats).reduce((s, v) => s + v, 0);
+    this.bonusPoints = Math.max(0, STARTING_STAT_TOTAL - baseSum);
+  }
+
+  /** Distribute one bonus point into a stat */
+  spendBonusPoint(stat: StatKey): boolean {
+    if (this.bonusPoints <= 0) return false;
+    this.stats[stat]++;
+    this.bonusPoints--;
+    return true;
+  }
+
+  /**
+   * Legacy: Generates random stats. Kept as fallback.
    */
   generateStartingStats(): void {
     const keys: StatKey[] = ['strength','intelligence','dexterity','agility','luck','vitality'];
     const s: Stats = { strength: MIN_STAT_VALUE, intelligence: MIN_STAT_VALUE,
       dexterity: MIN_STAT_VALUE, agility: MIN_STAT_VALUE,
       luck: MIN_STAT_VALUE, vitality: MIN_STAT_VALUE };
-
-    // Distribute remaining points randomly
     let remaining = STARTING_STAT_TOTAL - keys.length * MIN_STAT_VALUE;
     while (remaining > 0) {
       const key = keys[Math.floor(Math.random() * keys.length)];
@@ -128,15 +151,17 @@ export class Player {
       stats: { ...this.stats },
       talentPoints: this.talentPoints,
       affinity: this.affinity,
+      archetypeId: this.archetypeId,
     };
   }
 
-  fromJSON(data: ReturnType<Player['toJSON']>) {
+  fromJSON(data: { level: number; xp: number; stats: Stats; talentPoints: number; affinity: ElementType; archetypeId?: string }) {
     this.level = data.level;
     this.xp = data.xp;
     this.stats = { ...data.stats };
     this.talentPoints = data.talentPoints;
     this.affinity = data.affinity;
+    this.archetypeId = data.archetypeId ?? '';
     this.pendingLevelUp = false;
   }
 }

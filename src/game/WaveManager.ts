@@ -1,6 +1,6 @@
 import { ENEMY_DEFS, BOSS_DEFS, GOLEM_DEFS } from '../constants';
-import { CFG_WAVE_BASE_COUNT, CFG_WAVE_COUNT_PER_WAVE, CFG_ELITE_START_WAVE, CFG_ELITE_MULT,
-  CFG_ENEMY_HP_SCALE_PER_WAVE, CFG_ENEMY_SPEED_SCALE_PER_WAVE } from '../settings';
+import { CFG_WAVE_BASE_COUNT, CFG_WAVE_COUNT_PER_WAVE, CFG_ELITE_START_WAVE,
+  CFG_ELITE_BASE_MULT, CFG_ELITE_MAX_MULT, CFG_ELITE_SCALE_WAVES } from '../settings';
 import { Enemy, resetEnemyIds } from '../entities/Enemy';
 import type { Vec2 } from '../types';
 
@@ -39,10 +39,17 @@ function typeCountForWave(wave: number): number {
   return 5;
 }
 
-/** How many elite units appear (each is 1 enemy with CFG_ELITE_MULT power) */
+/** Gradual elite multiplier: ramps from base to max over CFG_ELITE_SCALE_WAVES */
+function eliteMultForWave(wave: number): number {
+  if (wave < CFG_ELITE_START_WAVE) return 1;
+  const progress = Math.min(1, (wave - CFG_ELITE_START_WAVE) / CFG_ELITE_SCALE_WAVES);
+  return CFG_ELITE_BASE_MULT + (CFG_ELITE_MAX_MULT - CFG_ELITE_BASE_MULT) * progress;
+}
+
+/** How many elite units appear */
 function eliteCountForWave(wave: number): number {
   if (wave < CFG_ELITE_START_WAVE) return 0;
-  return Math.floor((wave - CFG_ELITE_START_WAVE + 10) / 10);
+  return 1 + Math.floor((wave - CFG_ELITE_START_WAVE) / 10);
 }
 
 export class WaveManager {
@@ -77,7 +84,6 @@ export class WaveManager {
     this.isBossWave = this.currentWave % 10 === 0;
 
     const rng = waveRng(this.currentWave * 1337 + 7);
-    const baseMult = 1 + (this.currentWave - 1) * 0.1;
 
     if (this.isBossWave) {
       const bossIdx = Math.max(0, Math.floor((this.currentWave - 10) / 10)) % BOSS_DEFS.length;
@@ -126,7 +132,6 @@ export class WaveManager {
 
     const spawned: Enemy[] = [];
     const dtMs = dt * 1000;
-    const waveM = 1 + (this.currentWave - 1) * 0.1;
 
     // All enemy defs combined
     const allDefs = [...ENEMY_DEFS, ...GOLEM_DEFS, ...BOSS_DEFS];
@@ -139,8 +144,8 @@ export class WaveManager {
         if (q.timer <= 0) {
           const def = allDefs.find(d => d.id === q.typeId);
           if (!def) { q.spawned++; continue; }
-          const mult = q.isElite ? waveM * CFG_ELITE_MULT : waveM;
-          const e = new Enemy(def, mult);
+          const eliteMult = q.isElite ? eliteMultForWave(this.currentWave) : 1;
+          const e = new Enemy(def, this.currentWave, eliteMult);
           if (q.isElite) (e as any)._elite = true;  // mark for rendering
           e.pos = { x: waypoints[0]?.x ?? 0, y: waypoints[0]?.y ?? 0 };
           spawned.push(e);
@@ -158,5 +163,27 @@ export class WaveManager {
       this.betweenWaves = true;
     }
     return spawned;
+  }
+
+  /** Preview info for next wave (types, boss, elite count) */
+  getNextWavePreview(): { types: string[]; isBoss: boolean; eliteCount: number; enemyCount: number } {
+    const nextWave = this.currentWave + 1;
+    const isBoss = nextWave % 10 === 0;
+    if (isBoss) {
+      const bossIdx = Math.max(0, Math.floor((nextWave - 10) / 10)) % BOSS_DEFS.length;
+      return { types: [BOSS_DEFS[bossIdx].id], isBoss: true, eliteCount: 0, enemyCount: 1 };
+    }
+    const rng = waveRng(nextWave * 1337 + 7);
+    const pool = getEnemyPool(nextWave);
+    const typeCount = Math.min(typeCountForWave(nextWave), pool.length);
+    const chosen: string[] = [];
+    const poolCopy = [...pool];
+    for (let i = 0; i < typeCount; i++) {
+      const idx = Math.floor(rng() * poolCopy.length);
+      chosen.push(poolCopy.splice(idx, 1)[0]);
+    }
+    const baseCount = Math.round(CFG_WAVE_BASE_COUNT + nextWave * CFG_WAVE_COUNT_PER_WAVE);
+    const elites = eliteCountForWave(nextWave);
+    return { types: chosen, isBoss: false, eliteCount: elites, enemyCount: baseCount * typeCount + elites };
   }
 }

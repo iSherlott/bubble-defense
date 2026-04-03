@@ -99,7 +99,59 @@ export interface ProjectileData {
 }
 
 // ─── Game Screens ─────────────────────────────────────────────────────────────
-export type GameScreen = 'menu' | 'affinity' | 'game' | 'levelup' | 'talent' | 'gameover' | 'bestiary';
+export type GameScreen = 'menu' | 'affinity' | 'archetype' | 'game' | 'levelup' | 'talent' | 'gameover' | 'bestiary';
+// ─── Archetype System ────────────────────────────────────────────────────────
+export interface ArchetypeDef {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  color: string;
+  baseStats: Stats;
+}
+// ─── Fusion System ────────────────────────────────────────────────────────────
+export type FusionId = string;  // e.g. 'fire+earth' => 'magma'
+
+export interface FusionDef {
+  id: FusionId;
+  name: string;
+  primaryElement: ElementType;
+  secondaryElement: ElementType;
+  icon: string;
+  color: string;
+  description: string;
+  /** Magic damage multiplier applied on top of primary magic damage */
+  magicDamageMult: number;
+  /** Special effect ID */
+  specialEffect: string;
+}
+
+// ─── Item System ──────────────────────────────────────────────────────────────
+export type ItemRarity = 'common' | 'rare' | 'legendary';
+
+export interface ItemDef {
+  id: string;
+  name: string;
+  icon: string;
+  rarity: ItemRarity;
+  description: string;
+  /** The effect type for stacking */
+  effectType: 'gold_mult' | 'slow_aura' | 'discount';
+  effectValue: number;
+}
+
+export interface OwnedItem {
+  defId: string;
+  stacks: number;  // 1-3
+}
+
+// ─── Item Drop Animation ──────────────────────────────────────────────────────
+export interface ItemDropAnim {
+  item: ItemDef;
+  phase: 'rising' | 'showing' | 'fading';
+  timer: number;
+  totalTime: number;
+}
 
 // ─── Save Data ────────────────────────────────────────────────────────────────
 export interface SaveData {
@@ -111,6 +163,7 @@ export interface SaveData {
     talentPoints: number;
     affinity: ElementType;
     purchasedTalents: string[];
+    archetypeId?: string;
   };
   game: {
     gold: number;
@@ -118,6 +171,7 @@ export interface SaveData {
     wave: number;
     score: number;
     mapSeed?: number;
+    items: Array<{ defId: string; stacks: number }>;
     towers: Array<{
       typeId: string;
       gridX: number;
@@ -131,6 +185,7 @@ export interface SaveData {
       placedCost: number;
       goldSpent: number;
       isSecondary: boolean;
+      fusionId?: string;
     }>;
   };
   timestamp: number;

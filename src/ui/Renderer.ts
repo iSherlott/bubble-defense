@@ -1,4 +1,4 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle } from '../types';
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, Stats } from '../types';
 import type { Tower } from '../entities/Tower';
 import type { Enemy } from '../entities/Enemy';
 import type { Player } from '../player/Player';
@@ -10,7 +10,8 @@ import { CELL_SIZE, SIDEBAR_W, WAVE_BAR_H, TOWER_DEFS,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS, ELEMENT_DESCRIPTIONS,
   STAT_LABELS, STAT_DESCRIPTIONS, STAT_ICONS, OPPOSITE_ELEMENT,
   MAX_LEVEL, TALENT_POINT_EVERY, MAX_TOWER_LEVEL, MAP_EXPAND_COST,
-  ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS } from '../constants';
+  ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS, ITEM_DEFS, ITEM_RARITY_COLORS,
+  ITEM_RARITY_NAMES, getFusionDef, ARCHETYPE_DEFS } from '../constants';
 import { hasSave } from '../game/SaveSystem';
 
 type Rect = { x:number; y:number; w:number; h:number };
@@ -34,12 +35,18 @@ interface RenderState {
     upgradePopup: UpgradePopup|null;
     movingTower: Tower|null;
     currentMapTier: number;
+    items: OwnedItem[];
+    itemDropAnim: ItemDropAnim|null;
+    canFuse: boolean;
   };
   player: Player;
   talentTree: TalentTree;
   towersAt: (c:number,r:number) => Tower[];
   towerCost: (id:string) => number;
-  towerUpgradeCost: () => number;
+  towerUpgradeCost: (t?:Tower) => number;
+  gameSpeed: 1 | 2;
+  debugMode: boolean;
+  pendingAffinity: ElementType;
 }
 
 export class Renderer {
@@ -59,6 +66,9 @@ export class Renderer {
   private upgradePopupRect: Rect = {x:0,y:0,w:0,h:0};
   private bestiaryRects: Record<string,Rect> = {};
   private bestiaryPage = 0;  // 0=towers, 1=enemies, 2=golems
+  private debugBtns: Record<string,Rect> = {};
+  private archetypeRects: Map<string,Rect> = new Map();
+  private archetypeBackRect: Rect|null = null;
 
   private aoeFlashes: AoeFlash[] = [];
 
@@ -93,11 +103,12 @@ export class Renderer {
     this.ctx.clearRect(0, 0, this.cw, this.ch);
 
     switch (state.screen) {
-      case 'menu':     this.renderMenu(); break;
-      case 'affinity': this.renderAffinity(state.player); break;
-      case 'game':     this.renderGame(state); break;
-      case 'levelup':  this.renderLevelUp(state.player); break;
-      case 'talent':   this.renderTalents(state.player, state.talentTree); break;
+      case 'menu':      this.renderMenu(); break;
+      case 'affinity':  this.renderAffinity(state.player); break;
+      case 'archetype': this.renderArchetype(state.pendingAffinity); break;
+      case 'game':      this.renderGame(state); break;
+      case 'levelup':   this.renderLevelUp(state.player); break;
+      case 'talent':    this.renderTalents(state.player, state.talentTree); break;
       case 'gameover':  this.renderGameOver(state.game.score, state.game.waveManager.currentWave); break;
       case 'bestiary':  this.renderBestiary(); break;
     }
@@ -183,6 +194,75 @@ export class Renderer {
     });
     ctx.fillStyle='#555566'; ctx.font='12px Segoe UI';
     ctx.fillText('Clique em um elemento para iniciar',cw/2,cardY+cH+26);
+  }
+
+  // ─── Archetype Selection ────────────────────────────────────────────────────
+  private renderArchetype(affinity: ElementType) {
+    const ctx=this.ctx,cw=this.cw,ch=this.ch;
+    ctx.fillStyle='#09091c'; ctx.fillRect(0,0,cw,ch);
+    ctx.textAlign='center';
+    ctx.fillStyle='#ddddff'; ctx.font='bold 32px Segoe UI';
+    ctx.fillText('🛡  Escolha seu Arquétipo',cw/2,60);
+    ctx.font='13px Segoe UI'; ctx.fillStyle='#8888aa';
+    ctx.fillText(`Aptidão: ${ELEMENT_ICONS[affinity]} ${ELEMENT_NAMES[affinity]}  —  Cada arquétipo define seus atributos base + 5 pontos bônus.`,cw/2,90);
+
+    const archs=ARCHETYPE_DEFS;
+    const cW=200,cH=280,gap=16,total=archs.length*(cW+gap)-gap;
+    const startX=cw/2-total/2,cardY=115;
+    this.archetypeRects.clear();
+
+    const statKeys:(keyof Stats)[]=['strength','intelligence','dexterity','agility','luck','vitality'];
+    archs.forEach((arch,i)=>{
+      const rx=startX+i*(cW+gap);
+      ctx.fillStyle=arch.color+'18'; ctx.strokeStyle=arch.color+'cc';
+      ctx.lineWidth=2; this.rr(ctx,rx,cardY,cW,cH,14); ctx.fill(); ctx.stroke();
+
+      ctx.fillStyle=arch.color; ctx.font='42px serif';
+      ctx.fillText(arch.icon,rx+cW/2,cardY+52);
+      ctx.font='bold 17px Segoe UI'; ctx.fillText(arch.name,rx+cW/2,cardY+78);
+
+      ctx.font='10px Segoe UI'; ctx.fillStyle='#aaaacc';
+      wrapText(arch.description,24).forEach((l,li)=>ctx.fillText(l,rx+cW/2,cardY+96+li*13));
+
+      // Stat bars
+      let sy=cardY+148;
+      ctx.textAlign='left';
+      for(const k of statKeys){
+        const v=arch.baseStats[k];
+        ctx.fillStyle='#667788'; ctx.font='9px Segoe UI';
+        ctx.fillText(`${STAT_ICONS[k]} ${STAT_LABELS[k]}`,rx+10,sy+9);
+        // Bar background
+        ctx.fillStyle='#1a1a2e';
+        ctx.fillRect(rx+100,sy,86,10);
+        // Bar fill (scale: max 20)
+        const pct=Math.min(1,v/20);
+        ctx.fillStyle=arch.color+'88';
+        ctx.fillRect(rx+100,sy,86*pct,10);
+        ctx.fillStyle='#ddddee'; ctx.font='bold 8px Segoe UI'; ctx.textAlign='right';
+        ctx.fillText(String(v),rx+cW-10,sy+9);
+        ctx.textAlign='left';
+        sy+=16;
+      }
+      ctx.textAlign='center';
+
+      // Select button
+      const by=cardY+cH-36;
+      this.rr(ctx,rx+14,by,cW-28,28,8);
+      ctx.fillStyle=arch.color+'44'; ctx.fill();
+      ctx.strokeStyle=arch.color; ctx.lineWidth=1.5;
+      this.rr(ctx,rx+14,by,cW-28,28,8); ctx.stroke();
+      ctx.fillStyle=arch.color; ctx.font='bold 12px Segoe UI';
+      ctx.fillText('Escolher',rx+cW/2,by+19);
+      this.archetypeRects.set(arch.id,{x:rx,y:cardY,w:cW,h:cH});
+    });
+
+    // Back button
+    const backW=120,backH=28;
+    const backRect={x:cw/2-backW/2,y:cardY+cH+16,w:backW,h:backH};
+    this.btn(ctx,backRect,'← Voltar','#1a1a2a','#8888aa');
+    this.archetypeBackRect=backRect;
+
+    ctx.textAlign='left';
   }
 
   // ─── Game ──────────────────────────────────────────────────────────────────
@@ -292,12 +372,18 @@ export class Renderer {
     // Sidebar
     this.renderSidebar(state);
 
+    // Items HUD (top of game area)
+    this.renderItemsHUD(ctx, g.items);
+
     // Wave progress bar (bottom strip)
-    this.renderWaveBar(state.game.waveManager);
+    this.renderWaveBar(state.game.waveManager, state.game.enemies);
 
     // Upgrade popup
     if(g.upgradePopup)
-      this.renderUpgradePopup(ctx,g.upgradePopup,state.towersAt,state.towerCost,state.towerUpgradeCost(),g.gold);
+      this.renderUpgradePopup(ctx,g.upgradePopup,state.towersAt,state.towerCost,state.towerUpgradeCost(),g.gold,g.canFuse);
+
+    // Item drop animation
+    if(g.itemDropAnim) this.renderItemDropAnim(ctx,g.itemDropAnim);
 
     // Pause overlay
     if(state.paused){
@@ -307,52 +393,216 @@ export class Renderer {
       ctx.font='17px Segoe UI'; ctx.fillStyle='#7777aa';
       ctx.fillText('P ou ESC para continuar',this.gw/2,this.gh/2+44);
     }
+
+    // Debug overlay
+    if(state.debugMode) this.renderDebugPanel(ctx);
   }
 
   // ─── Wave progress bar ─────────────────────────────────────────────────────
-  private renderWaveBar(wm: WaveManager) {
+  private renderWaveBar(wm: WaveManager, enemies: Enemy[]) {
     const ctx=this.ctx;
     const barY=this.gh;
     const barW=this.gw;
+    const allDefs=[...ENEMY_DEFS,...GOLEM_DEFS,...BOSS_DEFS];
 
     ctx.fillStyle='#0a0a14'; ctx.fillRect(0,barY,barW+SIDEBAR_W,WAVE_BAR_H);
     ctx.strokeStyle='#252540'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(0,barY); ctx.lineTo(barW+SIDEBAR_W,barY); ctx.stroke();
 
     if(wm.waveActive){
-      const pct=wm.waveProgress;
-      // Background
-      ctx.fillStyle='#1a1a2a'; ctx.fillRect(8,barY+6,barW-16,WAVE_BAR_H-12);
-      // Fill
-      const grad=ctx.createLinearGradient(8,0,barW-8,0);
-      grad.addColorStop(0,wm.isBossWave?'#cc0044':'#2255ff');
-      grad.addColorStop(1,wm.isBossWave?'#ff4488':'#44aaff');
-      ctx.fillStyle=grad;
-      ctx.fillRect(8,barY+6,(barW-16)*pct,WAVE_BAR_H-12);
-      // Label
-      ctx.fillStyle='#ffffff'; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
-      ctx.fillText(
-        wm.isBossWave
-          ? `💀 BOSS — ${Math.round(pct*100)}%`
-          : `Onda ${wm.currentWave} — ${wm.enemiesKilledThisWave}/${wm.totalEnemiesThisWave} eliminados`,
-        barW/2, barY+WAVE_BAR_H/2+4
-      );
+      // Boss wave: show boss HP bar
+      if(wm.isBossWave){
+        const boss=enemies.find(e=>e.def.isBoss && !e.dead);
+        const pct=boss ? boss.hp/boss.maxHp : (wm.waveProgress);
+        ctx.fillStyle='#1a0a14'; ctx.fillRect(8,barY+6,barW-16,WAVE_BAR_H-12);
+        const grad=ctx.createLinearGradient(8,0,barW-8,0);
+        grad.addColorStop(0,'#cc0044');grad.addColorStop(1,'#ff4488');
+        ctx.fillStyle=grad;
+        ctx.fillRect(8,barY+6,(barW-16)*pct,WAVE_BAR_H-12);
+        ctx.fillStyle='#ffffff'; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
+        const hpText=boss ? `${Math.round(boss.hp)} / ${boss.maxHp}` : 'Derrotado!';
+        ctx.fillText(`💀 BOSS — ${hpText}  (${Math.round(pct*100)}%)`,barW/2,barY+WAVE_BAR_H/2+4);
+      } else {
+        const pct=wm.waveProgress;
+        ctx.fillStyle='#1a1a2a'; ctx.fillRect(8,barY+6,barW-16,WAVE_BAR_H-12);
+        const grad=ctx.createLinearGradient(8,0,barW-8,0);
+        grad.addColorStop(0,'#2255ff');grad.addColorStop(1,'#44aaff');
+        ctx.fillStyle=grad;
+        ctx.fillRect(8,barY+6,(barW-16)*pct,WAVE_BAR_H-12);
+        ctx.fillStyle='#ffffff'; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
+        ctx.fillText(`Onda ${wm.currentWave} — ${wm.enemiesKilledThisWave}/${wm.totalEnemiesThisWave} eliminados`,barW/2,barY+WAVE_BAR_H/2+4);
+      }
     } else {
-      ctx.fillStyle='#333355'; ctx.fillRect(8,barY+6,barW-16,WAVE_BAR_H-12);
-      ctx.fillStyle='#888899'; ctx.font='11px Segoe UI'; ctx.textAlign='center';
-      ctx.fillText(
-        wm.currentWave===0
-          ? 'Pronto para começar — clique em "Próxima Onda"'
-          : `Onda ${wm.currentWave} concluída!  Próxima: onda ${wm.currentWave+1}`,
-        barW/2, barY+WAVE_BAR_H/2+4
-      );
+      // Between waves: show preview of next wave
+      ctx.fillStyle='#1a1a28'; ctx.fillRect(8,barY+6,barW-16,WAVE_BAR_H-12);
+      ctx.textAlign='center';
+      if(wm.currentWave===0){
+        ctx.fillStyle='#888899'; ctx.font='11px Segoe UI';
+        ctx.fillText('Pronto para começar — clique em "Próxima Onda"',barW/2,barY+WAVE_BAR_H/2+4);
+      } else {
+        const preview=wm.getNextWavePreview();
+        const names=preview.types.map(id=>{
+          const d=allDefs.find(d=>d.id===id);
+          return d ? d.name : id;
+        });
+        let txt=`Próxima: Onda ${wm.currentWave+1}  ▸  `;
+        if(preview.isBoss) txt+=`💀 BOSS: ${names[0]}`;
+        else {
+          txt+=names.join(', ');
+          txt+=` (${preview.enemyCount})`;
+          if(preview.eliteCount>0) txt+=`  ⭐${preview.eliteCount} elites`;
+        }
+        ctx.fillStyle='#aabb99'; ctx.font='11px Segoe UI';
+        ctx.fillText(txt,barW/2,barY+WAVE_BAR_H/2+4);
+      }
     }
+  }
+
+  // ─── Items HUD (top of game area) ──────────────────────────────────────────
+  private renderItemsHUD(ctx: CanvasRenderingContext2D, items: OwnedItem[]) {
+    if(items.length===0) return;
+    const padding=4, iconSize=28, gap=3;
+    const totalW=items.length*(iconSize+gap)-gap+padding*2;
+    const hx=this.gw/2-totalW/2, hy=2;
+
+    // Background strip
+    ctx.fillStyle='rgba(10,10,30,0.75)';
+    this.rr(ctx,hx,hy,totalW,iconSize+padding*2,6); ctx.fill();
+    ctx.strokeStyle='#333366'; ctx.lineWidth=1;
+    this.rr(ctx,hx,hy,totalW,iconSize+padding*2,6); ctx.stroke();
+
+    let ix=hx+padding;
+    for(const owned of items){
+      const def=ITEM_DEFS.find(d=>d.id===owned.defId);
+      if(!def) continue;
+      const rc=ITEM_RARITY_COLORS[def.rarity];
+
+      // Item background
+      ctx.fillStyle=def.rarity==='legendary'?'#2a2000':def.rarity==='rare'?'#0a1530':'#141422';
+      this.rr(ctx,ix,hy+padding,iconSize,iconSize,4); ctx.fill();
+      ctx.strokeStyle=rc+'aa'; ctx.lineWidth=1;
+      this.rr(ctx,ix,hy+padding,iconSize,iconSize,4); ctx.stroke();
+
+      // Icon
+      ctx.font='14px serif'; ctx.textAlign='center';
+      ctx.fillText(def.icon,ix+iconSize/2,hy+padding+iconSize/2+5);
+
+      // Stack count
+      if(owned.stacks>1){
+        ctx.fillStyle='#ffffff'; ctx.font='bold 8px Segoe UI';
+        ctx.fillText(`×${owned.stacks}`,ix+iconSize-4,hy+padding+iconSize-1);
+      }
+      ctx.textAlign='left';
+      ix+=iconSize+gap;
+    }
+  }
+
+  // ─── Item Drop Animation ───────────────────────────────────────────────────
+  private renderItemDropAnim(ctx: CanvasRenderingContext2D, anim: ItemDropAnim) {
+    const cx=this.gw/2, cy=this.gh/2;
+    const t=anim.timer;
+    const item=anim.item;
+    const rc=ITEM_RARITY_COLORS[item.rarity];
+
+    ctx.save();
+
+    if(anim.phase==='rising'){
+      // Rising phase: item scales up from center with glow
+      const p=Math.min(1,t/0.6);
+      const scale=p*1.2;
+      const alpha=p;
+      ctx.globalAlpha=alpha;
+
+      // Glow
+      ctx.shadowColor=rc; ctx.shadowBlur=30+p*20;
+      ctx.fillStyle='rgba(0,0,0,0.6)';
+      this.rr(ctx,cx-100,cy-60,200,120,16); ctx.fill();
+      ctx.shadowBlur=0;
+
+      // Border
+      ctx.strokeStyle=rc; ctx.lineWidth=3;
+      this.rr(ctx,cx-100,cy-60,200,120,16); ctx.stroke();
+
+      // Icon
+      ctx.font=`${Math.round(40*scale)}px serif`; ctx.textAlign='center';
+      ctx.fillStyle='#ffffff';
+      ctx.fillText(item.icon,cx,cy+5*scale);
+
+    } else if(anim.phase==='showing'){
+      // Showing phase: full display with sparkle
+      ctx.globalAlpha=1;
+      const sparkle=0.7+0.3*Math.sin(t*8);
+
+      // Card background
+      ctx.shadowColor=rc; ctx.shadowBlur=25*sparkle;
+      ctx.fillStyle='rgba(8,8,25,0.92)';
+      this.rr(ctx,cx-120,cy-80,240,160,16); ctx.fill();
+      ctx.shadowBlur=0;
+
+      // Border with pulse
+      ctx.strokeStyle=rc; ctx.lineWidth=3;
+      this.rr(ctx,cx-120,cy-80,240,160,16); ctx.stroke();
+
+      // Rarity banner
+      ctx.fillStyle=rc; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
+      ctx.fillText(ITEM_RARITY_NAMES[item.rarity].toUpperCase(),cx,cy-60);
+
+      // Icon
+      ctx.font='44px serif';
+      ctx.fillText(item.icon,cx,cy+4);
+
+      // Name
+      ctx.fillStyle='#ffffff'; ctx.font='bold 14px Segoe UI';
+      ctx.fillText(item.name,cx,cy+36);
+
+      // Description  
+      ctx.fillStyle='#aaaacc'; ctx.font='10px Segoe UI';
+      ctx.fillText(item.description,cx,cy+54);
+
+      // Sparkle particles
+      for(let i=0;i<6;i++){
+        const ang=i/6*Math.PI*2+t*2;
+        const dist=50+15*Math.sin(t*4+i);
+        const sx=cx+Math.cos(ang)*dist, sy=cy+Math.sin(ang)*dist;
+        ctx.fillStyle=`rgba(255,255,200,${sparkle*0.6})`;
+        ctx.beginPath(); ctx.arc(sx,sy,2+sparkle,0,Math.PI*2); ctx.fill();
+      }
+
+    } else {
+      // Fading phase
+      const fadeStart=2.0;
+      const p=Math.max(0,1-(t-fadeStart)/0.5);
+      ctx.globalAlpha=p;
+
+      ctx.fillStyle='rgba(8,8,25,0.92)';
+      this.rr(ctx,cx-120,cy-80,240,160,16); ctx.fill();
+      ctx.strokeStyle=rc; ctx.lineWidth=3;
+      this.rr(ctx,cx-120,cy-80,240,160,16); ctx.stroke();
+
+      ctx.fillStyle=rc; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center';
+      ctx.fillText(ITEM_RARITY_NAMES[item.rarity].toUpperCase(),cx,cy-60);
+      ctx.font='44px serif'; ctx.fillText(item.icon,cx,cy+4);
+      ctx.fillStyle='#ffffff'; ctx.font='bold 14px Segoe UI';
+      ctx.fillText(item.name,cx,cy+36);
+    }
+
+    ctx.globalAlpha=1;
+    ctx.restore();
   }
 
   // ─── Tower drawing ─────────────────────────────────────────────────────────
   private drawTower(ctx: CanvasRenderingContext2D, tower: Tower) {
     const x=tower.pixelX, y=tower.pixelY, r=CELL_SIZE/2-5;
     const col=ELEMENT_COLORS[tower.def.element];
+
+    // Fusion aura
+    if(tower.fusionDef){
+      const pulse=0.4+0.6*Math.sin(Date.now()/300);
+      ctx.beginPath(); ctx.arc(x,y,r+10,0,Math.PI*2);
+      ctx.strokeStyle=tower.fusionDef.color+Math.round(pulse*200).toString(16).padStart(2,'0');
+      ctx.lineWidth=4;
+      ctx.shadowColor=tower.fusionDef.color; ctx.shadowBlur=18; ctx.stroke(); ctx.shadowBlur=0;
+    }
 
     // Dual magic aura
     if(tower.dualMagic){
@@ -366,9 +616,13 @@ export class Renderer {
     ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
     ctx.strokeStyle=tower.def.accentColor; ctx.lineWidth=2; ctx.stroke();
 
-    // Element symbol
+    // Element symbol / Fusion symbol
     ctx.fillStyle=col; ctx.font='10px serif'; ctx.textAlign='center';
-    ctx.fillText(tower.def.element==='fire'?'🔥':tower.def.element==='water'?'💧':tower.def.element==='earth'?'🌍':'💨',x,y+4);
+    if(tower.fusionDef){
+      ctx.fillText(tower.fusionDef.icon,x,y+4);
+    } else {
+      ctx.fillText(tower.def.element==='fire'?'🔥':tower.def.element==='water'?'💧':tower.def.element==='earth'?'🌍':'💨',x,y+4);
+    }
 
     // Cooldown arc
     if(tower.cooldown>0){
@@ -465,6 +719,25 @@ export class Renderer {
       ctx.fillStyle='#ff88ff'; ctx.font='bold 9px Segoe UI'; ctx.textAlign='center';
       ctx.fillText('BOSS',x,by-3);
     }
+
+    // Weakness / immunity icons above HP bar
+    const iconY = by - 11;
+    const iconS = 8;
+    ctx.font = `${iconS}px serif`;
+    ctx.textAlign = 'center';
+    // Immune element (grey with 🚫)
+    if (enemy.def.immune) {
+      ctx.fillStyle = '#666';
+      ctx.fillText(ELEMENT_ICONS[enemy.def.immune], x - iconS, iconY);
+      ctx.fillStyle = '#ff4444aa';
+      ctx.font = '6px serif';
+      ctx.fillText('✕', x - iconS + 5, iconY - 2);
+      ctx.font = `${iconS}px serif`;
+    }
+    // Weak element (bright with glow)
+    const weak = enemy.weakElement();
+    ctx.fillStyle = ELEMENT_COLORS[weak];
+    ctx.fillText(ELEMENT_ICONS[weak], x + iconS, iconY);
   }
 
   // ── Enemy shapes ──────────────────────────────────────────────────────────
@@ -622,24 +895,53 @@ export class Renderer {
 
     const bw=sw-20;
 
-    // Pause
-    const pauseRect={x:sx+10,y,w:bw,h:28};
-    this.btn(ctx,pauseRect,state.paused?'▶  Continuar':'⏸  Pausar','#1c1c3c','#6666aa');
-    this.gameUIBtns['pause']=pauseRect; y+=36;
+    // ── Single contextual action button ──
+    {
+      let label=''; let bg=''; let fg='';
+      if(state.paused){
+        label='▶  Continuar'; bg='#1a2a1a'; fg='#55cc55';
+      } else if(wm.waveActive){
+        label='⏸  Pausar'; bg='#1c1c3c'; fg='#6666aa';
+      } else {
+        label='⚡  Próxima Onda'; bg='#1a2a1a'; fg='#55cc55';
+      }
+      const mainRect={x:sx+10,y,w:bw,h:32};
+      this.btn(ctx,mainRect,label,bg,fg);
+      this.gameUIBtns['mainAction']=mainRect; y+=38;
 
-    // Next Wave (manual)
-    const canNext=wm.betweenWaves&&!wm.waveActive&&!state.autoWave;
-    const nwRect={x:sx+10,y,w:bw,h:28};
-    this.btn(ctx,nwRect,'⚡  Próxima Onda',canNext?'#1a2a1a':'#161616',canNext?'#55cc55':'#334433');
-    this.gameUIBtns['nextWave']=nwRect; y+=36;
+      // Indicators row (auto + speed + expand)
+      const indY=y;
+      ctx.font='9px Segoe UI';
 
-    // Auto-wave toggle
-    const awRect={x:sx+10,y,w:bw,h:28};
-    this.btn(ctx,awRect,
-      state.autoWave?'🔄  Auto: LIGADO':'🔄  Auto: DESLIGADO',
-      state.autoWave?'#1a2a0a':'#1c1c1c',
-      state.autoWave?'#88ff44':'#557755');
-    this.gameUIBtns['autoWave']=awRect; y+=36;
+      const colW=Math.floor((bw-8)/3);
+
+      // Auto indicator
+      const autoRect={x:sx+10,y:indY,w:colW,h:22};
+      this.btn(ctx,autoRect,
+        state.autoWave?'🔄 Auto: ON':'🔄 Auto: OFF',
+        state.autoWave?'#1a2a0a':'#1c1c1c',
+        state.autoWave?'#88ff44':'#557755');
+      this.gameUIBtns['autoWave']=autoRect;
+
+      // Speed toggle
+      const spdRect={x:sx+10+colW+4,y:indY,w:colW,h:22};
+      const fast=state.gameSpeed===2;
+      this.btn(ctx,spdRect,fast?'⏩ 2x':'▶ 1x',
+        fast?'#2a1a00':'#1c1c1c',
+        fast?'#ffaa44':'#777766');
+      this.gameUIBtns['speedToggle']=spdRect;
+
+      // Expand indicator
+      const canExpand=g.currentMapTier<3&&wm.betweenWaves;
+      const expAfford=g.gold>=MAP_EXPAND_COST;
+      const expRect={x:sx+10+2*(colW+4),y:indY,w:bw-2*(colW+4),h:22};
+      const expLabel=g.currentMapTier>=3?'🗺 Max':canExpand?`🗺 ${MAP_EXPAND_COST}g`:'🗺 ---';
+      this.btn(ctx,expRect,expLabel,
+        canExpand&&expAfford?'#0a1a1a':'#141414',
+        canExpand&&expAfford?'#44cccc':'#335555');
+      this.gameUIBtns['expandMap']=expRect;
+      y+=28;
+    }
 
     // Talent
     const tp=p.talentPoints;
@@ -651,16 +953,6 @@ export class Renderer {
     const bstRect={x:sx+10,y,w:bw,h:28};
     this.btn(ctx,bstRect,'📖  Mostruário','#0d0d22','#8888cc');
     this.gameUIBtns['bestiary']=bstRect; y+=34;
-
-    // Expand map button
-    const canExpand=g.currentMapTier<3&&wm.betweenWaves;
-    const expAfford=g.gold>=MAP_EXPAND_COST;
-    const expRect={x:sx+10,y,w:bw,h:28};
-    const expLabel=canExpand?`🗺  Expandir Mapa (${MAP_EXPAND_COST}g)`:g.currentMapTier>=3?'🗺  Mapa Máximo':'🗺  Expande entre ondas';
-    this.btn(ctx,expRect,expLabel,
-      canExpand&&expAfford?'#0a1a1a':'#141414',
-      canExpand&&expAfford?'#44cccc':'#335555');
-    this.gameUIBtns['expandMap']=expRect; y+=40;
 
     // Move mode indicator
     if(g.movingTower){
@@ -722,11 +1014,13 @@ export class Renderer {
     towerCost: (id:string)=>number,
     upgCost: number,
     gold: number,
+    canFuse: boolean = false,
   ){
     const here=towersAt(popup.col,popup.row);
     const pw=252, towerH=60, actionH=26, headerH=34, add2H=60, closeH=28;
+    const fusionH = canFuse ? 36 : 0;
     const towerRows=here.reduce((_,__)=>_+towerH+actionH+6,0);
-    const ph=headerH + towerRows + (here.length<2 ? add2H : 0) + closeH + 20;
+    const ph=headerH + towerRows + (here.length<2 ? add2H : 0) + fusionH + closeH + 20;
 
     let px=popup.col*CELL_SIZE+CELL_SIZE+4;
     let py=popup.row*CELL_SIZE;
@@ -761,8 +1055,8 @@ export class Renderer {
       ctx.fillText(maxed?'★':`${tower.level}`,lvlBx,lvlBy+3);
 
       ctx.textAlign='left';
-      const role=tower.isSecondary?'[2ª-Magia]':'[Base]';
-      ctx.fillStyle='#aaaaee'; ctx.font='bold 10px Segoe UI';
+      const role=tower.isSecondary?'[2ª-Magia]':tower.fusionDef?`[${tower.fusionDef.icon} ${tower.fusionDef.name}]`:'[Base]';
+      ctx.fillStyle=tower.fusionDef?tower.fusionDef.color:'#aaaaee'; ctx.font='bold 10px Segoe UI';
       ctx.fillText(`${tower.def.name} ${role}`,infoRect.x+27,infoRect.y+15);
       ctx.fillStyle='#777788'; ctx.font='8px Segoe UI';
       const dmgUps=tower.upgradeHistory.filter(h=>h==='damage').length;
@@ -812,6 +1106,35 @@ export class Renderer {
         this.upgradeBtns[`addSecond_${def.id}`]=r2;
       });
       ry+=bh2*2+8+4;
+    }
+
+    // Fusion button (shown when both towers are max level)
+    if(canFuse){
+      const primary = here.find(t => !t.isSecondary);
+      const secondary = here.find(t => t.isSecondary);
+      if(primary && secondary){
+        const fusion = getFusionDef(primary.def.element, secondary.def.element);
+        if(fusion){
+          const fusRect={x:px+8,y:ry,w:pw-16,h:30};
+
+          // Glowing background
+          ctx.shadowColor=fusion.color; ctx.shadowBlur=12;
+          ctx.fillStyle='#1a0a2a'; this.rr(ctx,fusRect.x,fusRect.y,fusRect.w,fusRect.h,8); ctx.fill();
+          ctx.shadowBlur=0;
+          ctx.strokeStyle=fusion.color; ctx.lineWidth=2;
+          this.rr(ctx,fusRect.x,fusRect.y,fusRect.w,fusRect.h,8); ctx.stroke();
+          ctx.lineWidth=1;
+
+          ctx.fillStyle=fusion.color; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
+          ctx.fillText(`${fusion.icon} FUSÃO: ${fusion.name}`,fusRect.x+fusRect.w/2,fusRect.y+14);
+          ctx.fillStyle='#ccccee'; ctx.font='8px Segoe UI';
+          ctx.fillText(fusion.description,fusRect.x+fusRect.w/2,fusRect.y+25);
+          ctx.textAlign='left';
+
+          this.upgradeBtns['fusion']=fusRect;
+          ry+=36;
+        }
+      }
     }
 
     const closeRect={x:px+8,y:ry+4,w:pw-16,h:closeH-6};
@@ -1073,6 +1396,46 @@ export class Renderer {
     ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
   }
 
+  // ─── Debug Panel ───────────────────────────────────────────────────────────
+  private renderDebugPanel(ctx: CanvasRenderingContext2D) {
+    this.debugBtns = {};
+    const pw=240, pad=8, btnH=26, gap=4;
+    const cmds: [string,string][] = [
+      ['gold_1000',    '💰  +1 000 Ouro'],
+      ['gold_10000',   '💰  +10 000 Ouro'],
+      ['levelup',      '⬆  Level Up (escolha)'],
+      ['levelup10',    '⬆  +10 Levels (auto)'],
+      ['maxlevel',     '⬆  Max Level 50'],
+      ['heal',         '❤  Curar (max vidas)'],
+      ['kill_all',     '💀  Matar Todos'],
+      ['skip_wave',    '⏭  Pular Onda'],
+      ['skip10',       '⏭  Pular +10 Ondas'],
+      ['give_item',    '🎁  Item Aleatório'],
+      ['max_towers',   '🏗  Max Todas Torres'],
+      ['god_mode',     '🛡  God Mode (9999 HP)'],
+    ];
+    const ph=pad*2+cmds.length*(btnH+gap)-gap+24;
+    const px=10, py=10;
+
+    // backdrop
+    ctx.fillStyle='rgba(0,0,0,0.85)';
+    this.rr(ctx,px,py,pw,ph,8); ctx.fill();
+    ctx.strokeStyle='#ff4444'; ctx.lineWidth=2;
+    this.rr(ctx,px,py,pw,ph,8); ctx.stroke();
+
+    ctx.fillStyle='#ff4444'; ctx.font='bold 13px Segoe UI'; ctx.textAlign='left';
+    ctx.fillText('🐛 DEBUG  (F12 para fechar)',px+pad,py+18);
+
+    let by=py+28;
+    for(const [id,label] of cmds){
+      const r={x:px+pad,y:by,w:pw-pad*2,h:btnH};
+      this.btn(ctx,r,label,'#1a0a0a','#ff8866');
+      this.debugBtns[id]=r;
+      by+=btnH+gap;
+    }
+    ctx.textAlign='left';
+  }
+
   // ─── Public accessors ──────────────────────────────────────────────────────
   getMenuButtonRects()      { return this.menuBtns; }
   getAffinityRects()        { return this.affinityRects; }
@@ -1085,6 +1448,9 @@ export class Renderer {
   getUpgradePopupBtns()     { return this.upgradeBtns; }
   getUpgradePopupRect()     { return this.upgradePopupRect; }
   getBestiaryRects()        { return this.bestiaryRects; }
+  getDebugBtns()             { return this.debugBtns; }
+  getArchetypeRects()        { return this.archetypeRects; }
+  getArchetypeBackRect()     { return this.archetypeBackRect; }
   handleBestiaryTabClick(p: {x:number;y:number}, hit: (p:{x:number;y:number},r:{x:number;y:number;w:number;h:number})=>boolean) {
     for(let i=0;i<3;i++){
       const r=this.bestiaryRects[`tab_${i}`];

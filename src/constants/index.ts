@@ -1,4 +1,4 @@
-import type { TowerDef, EnemyDef, ElementType, Talent } from '../types';
+import type { TowerDef, EnemyDef, ElementType, Talent, FusionDef, ItemDef, ArchetypeDef } from '../types';
 import {
   CFG_CELL_SIZE, CFG_SIDEBAR_W, CFG_WAVE_BAR_H,
   CFG_MAP_TIERS,
@@ -140,7 +140,7 @@ export const GOLEM_DEFS: EnemyDef[] = [
     baseHp: 300, speed: 35, agility: 2,
     immune: 'water', halfElements: ['wind', 'earth'],
     color: '#cc4400', size: 20, baseLivesLost: 2, reward: 35, xp: 12,
-    description: 'Cada dano recebido cura 0.01% do HP máx.',
+    description: 'Cada dano recebido cura 0.3% do HP máx.',
     golemType: 'fire',
   },
   {
@@ -199,8 +199,8 @@ export const TALENT_DEFS: Talent[] = [
     description:'+20% dano das torres de Fogo.',
     effectType:'damage', effectValue:0.20, purchased:false, cost:1 },
   { id:'fire_t2',  name:'Velocidade Ígnea',    element:'fire',  branch:0, tier:1, requiredLevel:20,
-    description:'+0.5% vel. de ataque das torres de Fogo.',
-    effectType:'speed', effectValue:0.005, purchased:false, cost:1 },
+    description:'+10% vel. de ataque das torres de Fogo.',
+    effectType:'speed', effectValue:0.10, purchased:false, cost:1 },
   { id:'fire_t3',  name:'Queimadura Arcana',   element:'fire',  branch:0, tier:2, requiredLevel:30,
     description:'Magia de Fogo aplica queimadura: 1% HP/s por 5s.',
     effectType:'specialEffect', effectValue:1, purchased:false, cost:1 },
@@ -212,8 +212,8 @@ export const TALENT_DEFS: Talent[] = [
     description:'+20% dano das torres de Água.',
     effectType:'damage', effectValue:0.20, purchased:false, cost:1 },
   { id:'water_t2', name:'Corrente Veloz',      element:'water', branch:1, tier:1, requiredLevel:20,
-    description:'+0.5% vel. de ataque das torres de Água.',
-    effectType:'speed', effectValue:0.005, purchased:false, cost:1 },
+    description:'+10% vel. de ataque das torres de Água.',
+    effectType:'speed', effectValue:0.10, purchased:false, cost:1 },
   { id:'water_t3', name:'Poça Elemental',      element:'water', branch:1, tier:2, requiredLevel:30,
     description:'Magia de Água tem 25% de chance de criar poça (lentidão 5% por 5s).',
     effectType:'specialEffect', effectValue:0.25, purchased:false, cost:1 },
@@ -225,8 +225,8 @@ export const TALENT_DEFS: Talent[] = [
     description:'+20% dano das torres de Terra.',
     effectType:'damage', effectValue:0.20, purchased:false, cost:1 },
   { id:'earth_t2', name:'Velocidade Sísmica',  element:'earth', branch:2, tier:1, requiredLevel:20,
-    description:'+0.5% vel. de ataque das torres de Terra.',
-    effectType:'speed', effectValue:0.005, purchased:false, cost:1 },
+    description:'+10% vel. de ataque das torres de Terra.',
+    effectType:'speed', effectValue:0.10, purchased:false, cost:1 },
   { id:'earth_t3', name:'Terremoto Amplo',     element:'earth', branch:2, tier:2, requiredLevel:30,
     description:'Área da magia de Terra aumenta 50%.',
     effectType:'specialEffect', effectValue:1.5, purchased:false, cost:1 },
@@ -238,8 +238,8 @@ export const TALENT_DEFS: Talent[] = [
     description:'+20% dano das torres de Vento.',
     effectType:'damage', effectValue:0.20, purchased:false, cost:1 },
   { id:'wind_t2',  name:'Ciclone Rápido',      element:'wind',  branch:3, tier:1, requiredLevel:20,
-    description:'+0.5% vel. de ataque das torres de Vento.',
-    effectType:'speed', effectValue:0.005, purchased:false, cost:1 },
+    description:'+10% vel. de ataque das torres de Vento.',
+    effectType:'speed', effectValue:0.10, purchased:false, cost:1 },
   { id:'wind_t3',  name:'Vórtice Paralisante', element:'wind',  branch:3, tier:2, requiredLevel:30,
     description:'Após empurrão de 3 tiles, inimigo fica 1s parado.',
     effectType:'specialEffect', effectValue:1, purchased:false, cost:1 },
@@ -272,9 +272,118 @@ export const STAT_DESCRIPTIONS: Record<string, string> = {
   dexterity:    'Precisão vs agilidade inimiga',
   agility:      '+5% velocidade de ataque',
   luck:         'Crítico = 1 + Sorte×0.1; +chance dual magia',
-  vitality:     '+0.1 vida recuperada por wave (inteiro)',
+  vitality:     '+0.25 vida recuperada por wave (inteiro)',
 };
 export const STAT_ICONS: Record<string, string> = {
   strength:'⚔', intelligence:'🔮', dexterity:'🎯',
   agility:'⚡', luck:'🍀', vitality:'❤',
+};
+
+// ─── Archetype Definitions ─────────────────────────────────────────────────────
+export const ARCHETYPE_DEFS: ArchetypeDef[] = [
+  {
+    id: 'mage', name: 'Mago', icon: '🧙', color: '#8855ff',
+    description: 'Foco em magia. Torres carregam magia mais rápido e causam mais dano mágico.',
+    baseStats: { strength: 5, intelligence: 14, dexterity: 7, agility: 6, luck: 6, vitality: 7 },
+  },
+  {
+    id: 'gunner', name: 'Atirador', icon: '🎯', color: '#ff5544',
+    description: 'Foco em ataque físico. Torres atacam mais rápido e com mais precisão.',
+    baseStats: { strength: 12, intelligence: 5, dexterity: 10, agility: 10, luck: 5, vitality: 5 },
+  },
+  {
+    id: 'economist', name: 'Econômico', icon: '💰', color: '#ffcc00',
+    description: 'Mais ouro e chance de crítico. Aproveita a economia para dominar.',
+    baseStats: { strength: 6, intelligence: 6, dexterity: 7, agility: 6, luck: 14, vitality: 6 },
+  },
+  {
+    id: 'tank', name: 'Tanque', icon: '🛡', color: '#44aaff',
+    description: 'Muita vitalidade e resistência. Recupera vida rapidamente entre ondas.',
+    baseStats: { strength: 8, intelligence: 5, dexterity: 6, agility: 5, luck: 5, vitality: 16 },
+  },
+];
+
+// ─── Fusion Definitions ───────────────────────────────────────────────────────
+// Key format: "primary+secondary" → fusion result
+// Primary element is the "key element" that determines the fusion's affinity.
+export const FUSION_DEFS: FusionDef[] = [
+  // Earth primary
+  { id:'earth+fire',  name:'Magma',      primaryElement:'earth', secondaryElement:'fire',
+    icon:'🌋', color:'#ff6600', description:'Lança magma derretido em área, queimando o chão.',
+    magicDamageMult:1.8, specialEffect:'magma_pool' },
+  { id:'earth+water', name:'Pântano',    primaryElement:'earth', secondaryElement:'water',
+    icon:'🏞', color:'#556b2f', description:'Cria pântano que prende e envenena inimigos.',
+    magicDamageMult:1.4, specialEffect:'swamp' },
+  { id:'earth+wind',  name:'Tempestade de Areia', primaryElement:'earth', secondaryElement:'wind',
+    icon:'🏜', color:'#daa520', description:'Reduz precisão dos inimigos e causa dano contínuo.',
+    magicDamageMult:1.5, specialEffect:'sandstorm' },
+
+  // Fire primary
+  { id:'fire+earth',  name:'Bola de Fogo', primaryElement:'fire', secondaryElement:'earth',
+    icon:'☄', color:'#ff4400', description:'Projétil explosivo com dano em área massivo.',
+    magicDamageMult:2.0, specialEffect:'fireball_aoe' },
+  { id:'fire+water',  name:'Vapor',       primaryElement:'fire', secondaryElement:'water',
+    icon:'♨', color:'#ccaaff', description:'Vapor escaldante que cega e queima.',
+    magicDamageMult:1.6, specialEffect:'steam' },
+  { id:'fire+wind',   name:'Inferno',     primaryElement:'fire', secondaryElement:'wind',
+    icon:'🔥', color:'#ff2200', description:'Fogo alimentado pelo vento, dano de queimadura triplicado.',
+    magicDamageMult:1.5, specialEffect:'inferno' },
+
+  // Water primary
+  { id:'water+fire',  name:'Gêiser',      primaryElement:'water', secondaryElement:'fire',
+    icon:'⛲', color:'#66ccff', description:'Erupção de água quente que atordoa.',
+    magicDamageMult:1.7, specialEffect:'geyser' },
+  { id:'water+earth', name:'Lama',        primaryElement:'water', secondaryElement:'earth',
+    icon:'💩', color:'#8b7355', description:'Lama pesada que diminui muito a velocidade.',
+    magicDamageMult:1.3, specialEffect:'mud' },
+  { id:'water+wind',  name:'Nevasca',     primaryElement:'water', secondaryElement:'wind',
+    icon:'❄', color:'#aaeeff', description:'Tempestade de gelo que congela em área.',
+    magicDamageMult:1.6, specialEffect:'blizzard' },
+
+  // Wind primary
+  { id:'wind+fire',   name:'Relâmpago',   primaryElement:'wind', secondaryElement:'fire',
+    icon:'⚡', color:'#ffff00', description:'Raio devastador que atinge múltiplos alvos em cadeia.',
+    magicDamageMult:2.2, specialEffect:'lightning' },
+  { id:'wind+water',  name:'Tsunami',     primaryElement:'wind', secondaryElement:'water',
+    icon:'🌊', color:'#0077cc', description:'Onda massiva que empurra todos os inimigos.',
+    magicDamageMult:1.5, specialEffect:'tsunami' },
+  { id:'wind+earth',  name:'Tornado',     primaryElement:'wind', secondaryElement:'earth',
+    icon:'🌪', color:'#88cc44', description:'Tornado com detritos que causa dano contínuo em área.',
+    magicDamageMult:1.8, specialEffect:'tornado' },
+];
+
+export function getFusionDef(primaryElement: string, secondaryElement: string): FusionDef | undefined {
+  return FUSION_DEFS.find(f => f.id === `${primaryElement}+${secondaryElement}`);
+}
+
+// ─── Item Definitions ─────────────────────────────────────────────────────────
+export const ITEM_DEFS: ItemDef[] = [
+  { id:'gold_2x',      name:'Saco de Moedas',      icon:'💰', rarity:'common',
+    description:'Cada inimigo dá +2 moedas.',    effectType:'gold_mult', effectValue:2 },
+  { id:'gold_5x',      name:'Baú de Ouro',         icon:'🪙', rarity:'rare',
+    description:'Cada inimigo dá +5 moedas.',    effectType:'gold_mult', effectValue:5 },
+  { id:'gold_10x',     name:'Tesouro do Dragão',   icon:'👑', rarity:'legendary',
+    description:'Cada inimigo dá +10 moedas.',   effectType:'gold_mult', effectValue:10 },
+  { id:'slow_1s',      name:'Aura Gélida',         icon:'🧊', rarity:'legendary',
+    description:'Inimigos surgem com 1s de lentidão.', effectType:'slow_aura', effectValue:1.0 },
+  { id:'discount_1',   name:'Cupom de Desconto',   icon:'🏷', rarity:'common',
+    description:'1% de desconto em compras.',     effectType:'discount', effectValue:0.01 },
+  { id:'discount_5',   name:'Negociante Astuto',   icon:'🤝', rarity:'common',
+    description:'5% de desconto em compras.',     effectType:'discount', effectValue:0.05 },
+  { id:'discount_10',  name:'Mestre Mercador',     icon:'🎩', rarity:'rare',
+    description:'10% de desconto em compras.',    effectType:'discount', effectValue:0.10 },
+  { id:'discount_50',  name:'Pacto Demoníaco',     icon:'😈', rarity:'legendary',
+    description:'50% de desconto em compras.',    effectType:'discount', effectValue:0.50 },
+];
+
+export const ITEM_RARITY_COLORS: Record<string, string> = {
+  common: '#aaaaaa',
+  rare: '#5599ff',
+  legendary: '#ffaa00',
+};
+
+export const ITEM_RARITY_NAMES: Record<string, string> = {
+  common: 'Comum',
+  rare: 'Raro',
+  legendary: 'Lendário',
 };
