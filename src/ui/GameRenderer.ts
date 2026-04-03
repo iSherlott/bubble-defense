@@ -9,9 +9,9 @@ import { CELL_SIZE, SIDEBAR_W, WAVE_BAR_H,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS,
   MAX_LEVEL, TALENT_POINT_EVERY, MAX_TOWER_LEVEL, MAP_EXPAND_COST,
   ITEM_RARITY_COLORS,
-  ITEM_RARITY_NAMES, getFusionDef } from '../constants';
+  ITEM_RARITY_NAMES } from '../constants';
 import { GameConfig } from '../config';
-import { towerRegistry, enemyRegistry, itemRegistry } from '../registries';
+import { towerRegistry, enemyRegistry, itemRegistry, fusionRegistry } from '../registries';
 import type { Rect } from './RenderUtils';
 import { btn, rr, wrapText } from './RenderUtils';
 import type { EntityRenderer } from './EntityRenderer';
@@ -46,6 +46,7 @@ export interface GameRenderState {
   getSynergyBonus: (t: Tower) => number;
   gameSpeed: 1 | 2;
   debugMode: boolean;
+  mousePos: Vec2;
 }
 
 export class GameRenderer {
@@ -176,7 +177,7 @@ export class GameRenderer {
     this.renderSidebar(ctx, gw, gh, state);
 
     // Items HUD (top of game area)
-    this.renderItemsHUD(ctx, gw, g.items, state.game.hoveredCell ? { x: 0, y: 0 } : { x: 0, y: 0 });
+    this.renderItemsHUD(ctx, gw, g.items, state.mousePos);
 
     // Wave progress bar (bottom strip)
     this.renderWaveBar(ctx, gw, gh, g.waveManager, g.enemies);
@@ -199,12 +200,6 @@ export class GameRenderer {
 
     // Debug overlay
     if (state.debugMode) this.renderDebugPanel(ctx);
-  }
-
-  renderGameWithMouse(ctx: CanvasRenderingContext2D, map: MapData, gw: number, gh: number, state: GameRenderState, mousePos: Vec2) {
-    this.renderGame(ctx, map, gw, gh, state);
-    // Re-render items HUD with proper mouse position
-    this.renderItemsHUD(ctx, gw, state.game.items, mousePos);
   }
 
   private renderWaveBar(ctx: CanvasRenderingContext2D, gw: number, gh: number, wm: WaveManager, enemies: Enemy[]) {
@@ -500,14 +495,14 @@ export class GameRenderer {
         fast ? '#ffaa44' : '#777766');
       this.gameUIBtns['speedToggle'] = spdRect;
 
-      const canExpand = g.currentMapTier < 3 && wm.betweenWaves;
+      const canExpand = g.currentMapTier < GameConfig.get().map.tiers.length - 1 && wm.betweenWaves;
       let discountFrac = 0;
       for (const owned of g.items) { const def = itemRegistry.getDef(owned.defId); if (def && def.effectType === 'discount') discountFrac += def.effectValue * owned.stacks; }
       discountFrac = Math.min(0.6, discountFrac);
       const expCost = Math.round(MAP_EXPAND_COST * (1 - discountFrac));
       const expAfford = g.gold >= expCost;
       const expRect = { x: sx + 10 + 2 * (colW + 4), y: indY, w: bw - 2 * (colW + 4), h: 22 };
-      const expLabel = g.currentMapTier >= 3 ? '🗺 Max' : canExpand ? `🗺 ${expCost}g` : '🗺 ---';
+      const expLabel = g.currentMapTier >= GameConfig.get().map.tiers.length - 1 ? '🗺 Max' : canExpand ? `🗺 ${expCost}g` : '🗺 ---';
       btn(ctx, expRect, expLabel,
         canExpand && expAfford ? '#0a1a1a' : '#141414',
         canExpand && expAfford ? '#44cccc' : '#335555');
@@ -697,7 +692,7 @@ export class GameRenderer {
       const primary = here.find(t => !t.isSecondary);
       const secondary = here.find(t => t.isSecondary);
       if (primary && secondary) {
-        const fusion = getFusionDef(primary.def.element, secondary.def.element);
+        const fusion = fusionRegistry.getDef(primary.def.element, secondary.def.element);
         if (fusion) {
           const fusRect = { x: px + 8, y: ry, w: pw - 16, h: 30 };
 

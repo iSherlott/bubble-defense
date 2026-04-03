@@ -350,11 +350,12 @@ export class CombatSystem {
   getSynergyBonus(tower: BaseTower, ctx: IGameContext): number {
     const here = ctx.towers.filter(t => t.gridX === tower.gridX && t.gridY === tower.gridY);
     if (here.length < 2) return 0;
-    const MAX_TOWER_LEVEL = 10; // from config
+    const maxLvl = GameConfig.get().tower.maxLevel;
+    const base = GameConfig.get().combat.synergyDamageBonus;
     const minLevel = Math.min(...here.map(t => t.level));
-    if (minLevel >= MAX_TOWER_LEVEL + 1) return 0.30;
-    if (minLevel >= 8) return 0.20;
-    if (minLevel >= 5) return 0.15;
-    return 0.10;
+    if (minLevel >= maxLvl + 1) return base * 2;
+    if (minLevel >= 8) return base * 1.33;
+    if (minLevel >= 5) return base;
+    return base * 0.67;
   }
 }

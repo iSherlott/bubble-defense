@@ -1,4 +1,4 @@
-import type { TowerDef, EnemyDef, ElementType, Talent, FusionDef, ItemDef, ArchetypeDef } from '../types';
+import type { TowerDef, EnemyDef, ElementType, FusionDef, ItemDef, ArchetypeDef } from '../types';
 import { GameConfig } from '../config';
 const C = GameConfig.get();
 
@@ -189,74 +189,6 @@ export const BOSS_DEFS: EnemyDef[] = [
   },
 ];
 
-// ─── Talent Definitions ───────────────────────────────────────────────────────
-export const TALENT_DEFS: Talent[] = [
-  { id:'fire_t1',  name:'Chamas Intensas',     element:'fire',  branch:0, tier:0, requiredLevel:10,
-    description:'+20% dano das torres de Fogo.',
-    effectType:'damage', effectValue:0.20, purchased:false, cost:1 },
-  { id:'fire_t2',  name:'Velocidade Ígnea',    element:'fire',  branch:0, tier:1, requiredLevel:20,
-    description:'+10% vel. de ataque das torres de Fogo.',
-    effectType:'speed', effectValue:0.10, purchased:false, cost:1 },
-  { id:'fire_t3',  name:'Queimadura Arcana',   element:'fire',  branch:0, tier:2, requiredLevel:30,
-    description:'Magia de Fogo aplica queimadura: 1% HP/s por 5s.',
-    effectType:'specialEffect', effectValue:1, purchased:false, cost:1 },
-  { id:'fire_t4',  name:'Forno Infernal',      element:'fire',  branch:0, tier:3, requiredLevel:40,
-    description:'Torres de Fogo carregam magia 25% mais rápido.',
-    effectType:'magicSpeed', effectValue:0.25, purchased:false, cost:1 },
-
-  { id:'water_t1', name:'Maré Profunda',       element:'water', branch:1, tier:0, requiredLevel:10,
-    description:'+20% dano das torres de Água.',
-    effectType:'damage', effectValue:0.20, purchased:false, cost:1 },
-  { id:'water_t2', name:'Corrente Veloz',      element:'water', branch:1, tier:1, requiredLevel:20,
-    description:'+10% vel. de ataque das torres de Água.',
-    effectType:'speed', effectValue:0.10, purchased:false, cost:1 },
-  { id:'water_t3', name:'Poça Elemental',      element:'water', branch:1, tier:2, requiredLevel:30,
-    description:'Magia de Água tem 25% de chance de criar poça (lentidão 5% por 5s).',
-    effectType:'specialEffect', effectValue:0.25, purchased:false, cost:1 },
-  { id:'water_t4', name:'Tempestade Gelada',   element:'water', branch:1, tier:3, requiredLevel:40,
-    description:'Torres de Água carregam magia 25% mais rápido.',
-    effectType:'magicSpeed', effectValue:0.25, purchased:false, cost:1 },
-
-  { id:'earth_t1', name:'Punho de Pedra',      element:'earth', branch:2, tier:0, requiredLevel:10,
-    description:'+20% dano das torres de Terra.',
-    effectType:'damage', effectValue:0.20, purchased:false, cost:1 },
-  { id:'earth_t2', name:'Velocidade Sísmica',  element:'earth', branch:2, tier:1, requiredLevel:20,
-    description:'+10% vel. de ataque das torres de Terra.',
-    effectType:'speed', effectValue:0.10, purchased:false, cost:1 },
-  { id:'earth_t3', name:'Terremoto Amplo',     element:'earth', branch:2, tier:2, requiredLevel:30,
-    description:'Área da magia de Terra aumenta 50%.',
-    effectType:'specialEffect', effectValue:1.5, purchased:false, cost:1 },
-  { id:'earth_t4', name:'Fúria da Montanha',   element:'earth', branch:2, tier:3, requiredLevel:40,
-    description:'Torres de Terra carregam magia 25% mais rápido.',
-    effectType:'magicSpeed', effectValue:0.25, purchased:false, cost:1 },
-
-  { id:'wind_t1',  name:'Rajada Cortante',     element:'wind',  branch:3, tier:0, requiredLevel:10,
-    description:'+20% dano das torres de Vento.',
-    effectType:'damage', effectValue:0.20, purchased:false, cost:1 },
-  { id:'wind_t2',  name:'Ciclone Rápido',      element:'wind',  branch:3, tier:1, requiredLevel:20,
-    description:'+10% vel. de ataque das torres de Vento.',
-    effectType:'speed', effectValue:0.10, purchased:false, cost:1 },
-  { id:'wind_t3',  name:'Vórtice Paralisante', element:'wind',  branch:3, tier:2, requiredLevel:30,
-    description:'Após empurrão de 3 tiles, inimigo fica 1s parado.',
-    effectType:'specialEffect', effectValue:1, purchased:false, cost:1 },
-  { id:'wind_t4',  name:'Furacão Primordial',  element:'wind',  branch:3, tier:3, requiredLevel:40,
-    description:'Torres de Vento carregam magia 25% mais rápido.',
-    effectType:'magicSpeed', effectValue:0.25, purchased:false, cost:1 },
-];
-
-// ─── Wave Definitions ─────────────────────────────────────────────────────────
-export const WAVE_DEFS = [
-  [{ typeId:'goblin',  count:6  }],
-  [{ typeId:'goblin',  count:8  }, { typeId:'troll',  count:2 }],
-  [{ typeId:'harpy',   count:6  }, { typeId:'goblin', count:4 }],
-  [{ typeId:'troll',   count:4  }, { typeId:'harpy',  count:4 }],
-  [{ typeId:'goblin',  count:12 }, { typeId:'golem',  count:1 }],
-  [{ typeId:'golem',   count:3  }, { typeId:'harpy',  count:6 }],
-  [{ typeId:'troll',   count:6  }, { typeId:'goblin', count:8 }],
-  [{ typeId:'golem',   count:4  }, { typeId:'harpy',  count:8 }],
-  [{ typeId:'dragon',  count:1  }, { typeId:'golem',  count:3 }],
-];
-
 // ─── Stat Labels ──────────────────────────────────────────────────────────────
 export const STAT_LABELS: Record<string, string> = {
   strength:'Força', intelligence:'Inteligência', dexterity:'Destreza',
@@ -361,10 +293,6 @@ export const FUSION_DEFS: FusionDef[] = [
     icon:'🌪', color:'#88cc44', description:'Tornado com detritos que causa dano contínuo em área.',
     magicDamageMult:1.8, specialEffect:'tornado' },
 ];
-
-export function getFusionDef(primaryElement: string, secondaryElement: string): FusionDef | undefined {
-  return FUSION_DEFS.find(f => f.id === `${primaryElement}+${secondaryElement}`);
-}
 
 // ─── Item Definitions ─────────────────────────────────────────────────────────
 export const ITEM_DEFS: ItemDef[] = [

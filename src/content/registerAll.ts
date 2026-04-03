@@ -45,7 +45,7 @@ import {
   fourTidesCrownEffect, cataclysmRelicEffect,
 } from '../behaviors/ItemEffects';
 
-import type { MagicBehavior } from '../behaviors/types';
+import type { MagicBehavior, FusionBehavior } from '../behaviors/types';
 
 // ─── Magic behavior map ────────────────────────────────────────────────────────
 const magicBehaviors: Record<string, MagicBehavior> = {
@@ -56,7 +56,7 @@ const magicBehaviors: Record<string, MagicBehavior> = {
 };
 
 // ─── Fusion behavior map ───────────────────────────────────────────────────────
-const fusionBehaviors: Record<string, InstanceType<any>> = {
+const fusionBehaviors: Record<string, FusionBehavior> = {
   magma_pool:         new AoeFusionBehavior(true),
   fireball_aoe:       new AoeFusionBehavior(true),
   sandstorm:          new AoeFusionBehavior(false),

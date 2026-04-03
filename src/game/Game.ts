@@ -401,7 +401,7 @@ export class Game implements IGameContext {
     return Math.max(1, Math.round(base * (1 - this.itemSystem.getDiscount(this.items))));
   }
 
-  /** Per-tower upgrade cost: baseCost × (1 + upgradeCount × 0.3), minus item discount */
+  /** Per-tower upgrade cost: baseCost × (1 + upgradeCount × 0.2), minus item discount */
   towerUpgradeCost(tower?: Tower): number {
     if (!tower) return 50; // fallback
     const base = Math.round(tower.def.baseCost * (1 + tower.upgradeCount * 0.2));
@@ -468,7 +468,7 @@ export class Game implements IGameContext {
 
   expandMap() {
     const nextTier = this.currentMapTier + 1;
-    if (nextTier >= 4) return;  // already max tier
+    if (nextTier >= GameConfig.get().map.tiers.length) return;  // already max tier
     const cost = Math.round(MAP_EXPAND_COST * (1 - this.itemSystem.getDiscount(this.items)));
     if (this.gold < cost) return;
     this.gold -= cost;
@@ -542,6 +542,8 @@ export class Game implements IGameContext {
     ft.totalDamageDealt = primary.totalDamageDealt + secondary.totalDamageDealt;
     ft.totalKills     = primary.totalKills + secondary.totalKills;
     ft.isSecondary    = false;
+    ft.cooldown       = primary.cooldown;
+    ft.magicBar       = primary.magicBar;
 
     // Replace both towers with the fused one
     this.towers = this.towers.filter(t => t.id !== primary.id && t.id !== secondary.id);
@@ -640,6 +642,7 @@ export class Game implements IGameContext {
   }
 
   saveCurrentGame() {
+    if (this.waveManager.waveActive) return; // only save between waves
     saveGame({
       version: 1,
       player: { ...this.player.toJSON(), purchasedTalents: this.talentTree.getPurchasedIds() },

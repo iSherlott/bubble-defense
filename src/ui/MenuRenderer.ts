@@ -60,7 +60,7 @@ export class MenuRenderer {
       ctx.fillText('vs ' + ELEMENT_NAMES[OPPOSITE_ELEMENT[el]], rx + ew / 2 + 12, ry + 46);
     });
     ctx.fillStyle = '#444466'; ctx.font = '12px Segoe UI';
-    ctx.fillText('Clique direito → detalhes  |  P = pausar  |  Custo inicial: 50g (multiplica por torres colocadas)', cw / 2, 520);
+    ctx.fillText('Clique direito → detalhes  |  P = pausar  |  Custo inicial: 80g (multiplica por torres colocadas)', cw / 2, 520);
   }
 
   renderAffinity(ctx: CanvasRenderingContext2D, cw: number, ch: number, player: Player) {
@@ -70,7 +70,7 @@ export class MenuRenderer {
     ctx.fillText('✨  Escolha sua Aptidão Elemental', cw / 2, 72);
     ctx.font = '14px Segoe UI'; ctx.fillStyle = '#8888aa';
     ctx.fillText('Seu elemento: torres desse tipo causam 2× dano.  Sem penalidade nos demais.', cw / 2, 104);
-    ctx.fillText('50 atributos iniciais distribuídos aleatoriamente (mín. 5 cada).', cw / 2, 122);
+    ctx.fillText('Escolha um arquétipo e distribua pontos bônus na tela seguinte.', cw / 2, 122);
 
     const elems: ElementType[] = ['fire', 'water', 'earth', 'wind'];
     const cW = 206, cH = 268, gap = 16, total = elems.length * (cW + gap) - gap;

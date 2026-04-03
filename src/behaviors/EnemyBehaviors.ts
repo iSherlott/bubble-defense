@@ -36,9 +36,10 @@ export class FireTrailBehavior implements EnemyBehavior {
     enemy._trailTimer -= dt;
     if (enemy._trailTimer <= 0) {
       enemy._trailTimer = 2.0;
-      ctx.puddles.push({
+      // Create a burn zone that damages towers' targets (hazard fire zone)
+      ctx.burnZones.push({
         x: enemy.pos.x, y: enemy.pos.y, radius: 35,
-        remaining: 6, slowAmount: -0.10,
+        remaining: 6, dmgPerSec: enemy.maxHp * 0.02,
       });
       ctx.addFT(enemy.pos, '🔥 Rastro!', '#ff4400');
     }
