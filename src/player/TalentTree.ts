@@ -1,6 +1,7 @@
 import type { Talent, ElementType } from '../types';
 import type { Stats } from '../types';
 import { TALENT_DEFS } from '../constants';
+import { CFG_WATER_PUDDLE_CHANCE } from '../settings';
 
 export class TalentTree {
   talents: Talent[];
@@ -58,7 +59,7 @@ export class TalentTree {
 
   /** Water T3: 25% chance to place puddle on magic hit */
   waterPuddleChance(): number {
-    return this.talents.some(t => t.id === 'water_t3' && t.purchased) ? 0.25 : 0;
+    return this.talents.some(t => t.id === 'water_t3' && t.purchased) ? CFG_WATER_PUDDLE_CHANCE : 0;
   }
 
   /** Earth T3: AoE radius multiplier (1.0 = normal, 1.5 = 50% bigger) */

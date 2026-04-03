@@ -12,6 +12,7 @@ import { CELL_SIZE, SIDEBAR_W, WAVE_BAR_H, TOWER_DEFS,
   MAX_LEVEL, TALENT_POINT_EVERY, MAX_TOWER_LEVEL, MAP_EXPAND_COST,
   ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS, ITEM_DEFS, ITEM_RARITY_COLORS,
   ITEM_RARITY_NAMES, getFusionDef, ARCHETYPE_DEFS } from '../constants';
+import { CFG_MOVE_COST_MULT } from '../settings';
 import { hasSave } from '../game/SaveSystem';
 
 type Rect = { x:number; y:number; w:number; h:number };
@@ -69,6 +70,9 @@ export class Renderer {
   private debugBtns: Record<string,Rect> = {};
   private archetypeRects: Map<string,Rect> = new Map();
   private archetypeBackRect: Rect|null = null;
+  private bonusStatBtns: Record<string,Rect> = {};
+  private bonusStartBtn: Rect|null = null;
+  private bonusBackBtn: Rect|null = null;
 
   private aoeFlashes: AoeFlash[] = [];
 
@@ -106,6 +110,7 @@ export class Renderer {
       case 'menu':      this.renderMenu(); break;
       case 'affinity':  this.renderAffinity(state.player); break;
       case 'archetype': this.renderArchetype(state.pendingAffinity); break;
+      case 'bonus':     this.renderBonus(state.player); break;
       case 'game':      this.renderGame(state); break;
       case 'levelup':   this.renderLevelUp(state.player); break;
       case 'talent':    this.renderTalents(state.player, state.talentTree); break;
@@ -265,6 +270,75 @@ export class Renderer {
     ctx.textAlign='left';
   }
 
+  // ─── Bonus Points Distribution ──────────────────────────────────────────────
+  private renderBonus(player: Player) {
+    const ctx=this.ctx,cw=this.cw,ch=this.ch;
+    ctx.fillStyle='#09091c'; ctx.fillRect(0,0,cw,ch);
+    ctx.textAlign='center';
+    ctx.fillStyle='#ddddff'; ctx.font='bold 28px Segoe UI';
+    ctx.fillText('🎲  Distribua seus Pontos Bônus',cw/2,50);
+    ctx.fillStyle='#8888aa'; ctx.font='13px Segoe UI';
+    ctx.fillText(`Pontos restantes: ${player.bonusPoints}`,cw/2,78);
+
+    const statKeys:(keyof Stats)[]=['strength','intelligence','dexterity','agility','luck','vitality'];
+    const statColors:Record<string,string>={strength:'#ff6644',intelligence:'#aa66ff',dexterity:'#66ccff',agility:'#ffcc33',luck:'#44dd44',vitality:'#ff6699'};
+    const rowH=52, startY=110;
+    const panelW=440, panelX=cw/2-panelW/2;
+    this.bonusStatBtns={};
+
+    statKeys.forEach((k,i)=>{
+      const y=startY+i*rowH;
+      // Background row
+      ctx.fillStyle=i%2===0?'#0d0d1e':'#10102a';
+      ctx.fillRect(panelX,y,panelW,rowH-4);
+
+      // Icon + label
+      ctx.textAlign='left';
+      ctx.fillStyle=statColors[k]; ctx.font='bold 14px Segoe UI';
+      ctx.fillText(`${STAT_ICONS[k]} ${STAT_LABELS[k]}`,panelX+14,y+22);
+      ctx.fillStyle='#7777aa'; ctx.font='10px Segoe UI';
+      ctx.fillText(STAT_DESCRIPTIONS[k],panelX+14,y+38);
+
+      // Current value
+      ctx.textAlign='center';
+      ctx.fillStyle='#eeeeff'; ctx.font='bold 22px Segoe UI';
+      ctx.fillText(String(player.stats[k]),panelX+panelW-90,y+30);
+
+      // + button
+      const btnR={x:panelX+panelW-50,y:y+8,w:36,h:32};
+      const canAdd=player.bonusPoints>0;
+      this.rr(ctx,btnR.x,btnR.y,btnR.w,btnR.h,6);
+      ctx.fillStyle=canAdd?statColors[k]+'33':'#1a1a2a'; ctx.fill();
+      this.rr(ctx,btnR.x,btnR.y,btnR.w,btnR.h,6);
+      ctx.strokeStyle=canAdd?statColors[k]:'#333344'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle=canAdd?'#eeeeff':'#444455'; ctx.font='bold 18px Segoe UI';
+      ctx.fillText('+',btnR.x+btnR.w/2,btnR.y+23);
+      this.bonusStatBtns[k]=btnR;
+    });
+
+    ctx.textAlign='center';
+
+    // Start button
+    const allSpent=player.bonusPoints<=0;
+    const startW=180,startH=38;
+    const startRect={x:cw/2-startW/2,y:startY+statKeys.length*rowH+20,w:startW,h:startH};
+    this.rr(ctx,startRect.x,startRect.y,startRect.w,startRect.h,10);
+    ctx.fillStyle=allSpent?'#224422':'#1a1a2a'; ctx.fill();
+    this.rr(ctx,startRect.x,startRect.y,startRect.w,startRect.h,10);
+    ctx.strokeStyle=allSpent?'#55cc55':'#333344'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle=allSpent?'#55ff55':'#555566'; ctx.font='bold 16px Segoe UI';
+    ctx.fillText(allSpent?'⚔ Iniciar Partida':'Distribua todos os pontos',startRect.x+startRect.w/2,startRect.y+25);
+    this.bonusStartBtn=startRect;
+
+    // Back button
+    const backW=120,backH=28;
+    const backRect={x:cw/2-backW/2,y:startRect.y+startH+14,w:backW,h:backH};
+    this.btn(ctx,backRect,'← Voltar','#1a1a2a','#8888aa');
+    this.bonusBackBtn=backRect;
+
+    ctx.textAlign='left';
+  }
+
   // ─── Game ──────────────────────────────────────────────────────────────────
   private renderGame(state: RenderState) {
     const ctx=this.ctx, g=state.game;
@@ -355,6 +429,12 @@ export class Renderer {
         ctx.beginPath(); ctx.arc(proj.x,proj.y,r+3,0,Math.PI*2);
         ctx.strokeStyle=proj.color+'66'; ctx.lineWidth=2; ctx.stroke();
       }
+      // Multi-element ring: show secondary element as outer ring
+      if(proj.components && proj.components.length>1){
+        const secColor=ELEMENT_COLORS[proj.components[1].element];
+        ctx.beginPath(); ctx.arc(proj.x,proj.y,r+2,0,Math.PI*2);
+        ctx.strokeStyle=secColor+'aa'; ctx.lineWidth=1.5; ctx.stroke();
+      }
     }
 
     // Enemies
@@ -380,7 +460,7 @@ export class Renderer {
 
     // Upgrade popup
     if(g.upgradePopup)
-      this.renderUpgradePopup(ctx,g.upgradePopup,state.towersAt,state.towerCost,state.towerUpgradeCost(),g.gold,g.canFuse);
+      this.renderUpgradePopup(ctx,g.upgradePopup,state.towersAt,state.towerCost,state.towerUpgradeCost,g.gold,g.canFuse);
 
     // Item drop animation
     if(g.itemDropAnim) this.renderItemDropAnim(ctx,g.itemDropAnim);
@@ -665,6 +745,16 @@ export class Renderer {
       const p=0.5+0.5*Math.sin(Date.now()/280);
       ctx.beginPath(); ctx.arc(x,y,r+9,0,Math.PI*2);
       ctx.strokeStyle=`rgba(255,80,200,${p*0.7})`; ctx.lineWidth=5; ctx.stroke();
+    }
+
+    // Boss shield phase (purple ring)
+    if(enemy.bossShieldActive){
+      const p=0.5+0.5*Math.sin(Date.now()/150);
+      ctx.beginPath(); ctx.arc(x,y,r+12,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(160,80,255,${p*0.9})`; ctx.lineWidth=4; ctx.setLineDash([6,3]); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='#cc88ff'; ctx.font='bold 8px Segoe UI'; ctx.textAlign='center';
+      ctx.fillText('🛡 IMUNE',x,y-r-22);
     }
 
     // Stun ring
@@ -1012,7 +1102,7 @@ export class Renderer {
     popup: UpgradePopup,
     towersAt: (c:number,r:number)=>Tower[],
     towerCost: (id:string)=>number,
-    upgCost: number,
+    towerUpgradeCost: (t?:Tower)=>number,
     gold: number,
     canFuse: boolean = false,
   ){
@@ -1055,14 +1145,15 @@ export class Renderer {
       ctx.fillText(maxed?'★':`${tower.level}`,lvlBx,lvlBy+3);
 
       ctx.textAlign='left';
-      const role=tower.isSecondary?'[2ª-Magia]':tower.fusionDef?`[${tower.fusionDef.icon} ${tower.fusionDef.name}]`:'[Base]';
+      const role=tower.isSecondary?'[2ª]':tower.fusionDef?`[${tower.fusionDef.icon} ${tower.fusionDef.name}]`:'[Base]';
       ctx.fillStyle=tower.fusionDef?tower.fusionDef.color:'#aaaaee'; ctx.font='bold 10px Segoe UI';
       ctx.fillText(`${tower.def.name} ${role}`,infoRect.x+27,infoRect.y+15);
       ctx.fillStyle='#777788'; ctx.font='8px Segoe UI';
       const dmgUps=tower.upgradeHistory.filter(h=>h==='damage').length;
       const spdUps=tower.upgradeHistory.filter(h=>h==='speed').length;
-      ctx.fillText(`Dmg×${tower.damageMult.toFixed(1)} Spd×${tower.speedMult.toFixed(1)}${tower.upgradeCount>0?` ⚔${dmgUps}⚡${spdUps}`:''}`,infoRect.x+27,infoRect.y+27);
-      ctx.fillText(`Venda: ${Math.floor(tower.goldSpent/2)}g | Mover: ${tower.placedCost*2}g`,infoRect.x+27,infoRect.y+39);
+      const fusionInfo=tower.fusionDef?` ${ELEMENT_ICONS[tower.fusionDef.primaryElement]}+${ELEMENT_ICONS[tower.fusionDef.secondaryElement]}`:'';
+      ctx.fillText(`Dmg×${tower.damageMult.toFixed(1)} Spd×${tower.speedMult.toFixed(1)}${tower.upgradeCount>0?` ⚔${dmgUps}⚡${spdUps}`:''}${fusionInfo}`,infoRect.x+27,infoRect.y+27);
+      ctx.fillText(`Venda: ${Math.floor(tower.goldSpent/2)}g | Mover: ${Math.round(tower.placedCost*CFG_MOVE_COST_MULT)}g`,infoRect.x+27,infoRect.y+39);
       if(tower.dualMagic){ctx.fillStyle='#ffff44'; ctx.font='bold 7px Segoe UI'; ctx.fillText('✨DUAL',infoRect.x+pw-60,infoRect.y+15);}
 
       ry+=towerH;
@@ -1073,10 +1164,12 @@ export class Renderer {
       const mvRect={x:px+12+bw3,y:ry,w:bw3,h:actionH};
       const slRect={x:px+16+bw3*2,y:ry,w:bw3,h:actionH};
 
+      const upgCost=towerUpgradeCost(tower);
       const canUp=!maxed&&gold>=upgCost;
       this.btn(ctx,upRect,maxed?'★ Máx':`⬆ ${upgCost}g`,canUp?'#0d1f0d':'#1a1a1a',canUp?'#55bb55':'#445544');
-      const canMv=gold>=tower.placedCost*2;
-      this.btn(ctx,mvRect,`📦 ${tower.placedCost*2}g`,canMv?'#0d1522':'#1a1a1a',canMv?'#4499cc':'#335577');
+      const mvCost=Math.round(tower.placedCost*CFG_MOVE_COST_MULT);
+      const canMv=gold>=mvCost;
+      this.btn(ctx,mvRect,`📦 ${mvCost}g`,canMv?'#0d1522':'#1a1a1a',canMv?'#4499cc':'#335577');
       this.btn(ctx,slRect,`🏷 ${Math.floor(tower.goldSpent/2)}g`,'#220f0f','#cc5533');
 
       this.upgradeBtns[`upgrade_${i}`]=upRect;
@@ -1088,7 +1181,7 @@ export class Renderer {
     // Add 2nd tower: 4-element grid
     if(here.length<2){
       ctx.fillStyle='#888899'; ctx.font='bold 9px Segoe UI';
-      ctx.fillText('➕ Adicionar 2ª Torre (só dispara magia):',px+10,ry+12);
+      ctx.fillText('➕ Adicionar 2ª Torre:',px+10,ry+12);
       ry+=16;
       const bw2=(pw-20)/2, bh2=20;
       TOWER_DEFS.forEach((def,idx)=>{
@@ -1451,6 +1544,9 @@ export class Renderer {
   getDebugBtns()             { return this.debugBtns; }
   getArchetypeRects()        { return this.archetypeRects; }
   getArchetypeBackRect()     { return this.archetypeBackRect; }
+  getBonusStatBtns()         { return this.bonusStatBtns; }
+  getBonusStartBtn()         { return this.bonusStartBtn; }
+  getBonusBackBtn()          { return this.bonusBackBtn; }
   handleBestiaryTabClick(p: {x:number;y:number}, hit: (p:{x:number;y:number},r:{x:number;y:number;w:number;h:number})=>boolean) {
     for(let i=0;i<3;i++){
       const r=this.bestiaryRects[`tab_${i}`];

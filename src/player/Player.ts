@@ -117,10 +117,11 @@ export class Player {
     return 1 + this.stats.luck * CFG_LUCK_CRIT_MULT;
   }
 
-  /** Hit chance against a given enemy agility */
+  /** Hit chance against a given enemy agility — smooth curve with diminishing returns */
   hitChance(enemyAgility: number): number {
-    const dex = this.stats.dexterity;
-    return Math.min(1.0, Math.max(CFG_MIN_HIT_CHANCE, dex / enemyAgility));
+    const ratio = this.stats.dexterity / Math.max(1, enemyAgility);
+    // Exponential curve: approaches 1.0 asymptotically. k=1.5 gives ~78% at ratio=1, ~95% at ratio=2
+    return Math.min(1.0, Math.max(CFG_MIN_HIT_CHANCE, 1 - Math.exp(-1.5 * ratio)));
   }
 
   /** Gold multiplier from Luck */

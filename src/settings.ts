@@ -49,7 +49,7 @@ export const CFG_ENEMY_XP_SCALE             = 0.03; // +3% XP reward per wave
 
 // ─── Wave composition ─────────────────────────────────────────────────────────
 export const CFG_WAVE_BASE_COUNT     = 6;    // enemies per type at wave 1
-export const CFG_WAVE_COUNT_PER_WAVE = 0.5;  // additional enemies per wave per type
+export const CFG_WAVE_COUNT_PER_WAVE = 0.3;  // additional enemies per wave per type
 export const CFG_ELITE_START_WAVE    = 20;   // first wave with elite units
 export const CFG_ELITE_BASE_MULT     = 2;    // elite multiplier at start wave
 export const CFG_ELITE_MAX_MULT      = 10;   // elite multiplier cap
@@ -76,8 +76,8 @@ export const CFG_PUDDLE_RADIUS      = 40;   // px radius of water puddle
 export const CFG_PUDDLE_DURATION    = 8;    // seconds puddle lasts
 export const CFG_PUDDLE_SLOW_AMOUNT = 0.05; // fraction of speed reduction in puddle
 export const CFG_WATER_PUDDLE_CHANCE = 0.25; // chance to spawn puddle on water magic hit (with talent)
-export const CFG_PERM_SLOW_PER_STACK = 0.05; // speed reduction per permanent slow stack
-export const CFG_MAX_PERM_SLOW_STACKS = 19;  // cap on permanent slow stacks
+export const CFG_PERM_SLOW_PER_STACK = 0.08; // multiplicative slow per stack (diminishing returns)
+export const CFG_MAX_PERM_SLOW_STACKS = 25;  // cap on permanent slow stacks
 
 // ─── Map growth ───────────────────────────────────────────────────────────────
 export const CFG_MAP_TIERS = [

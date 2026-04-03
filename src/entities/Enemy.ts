@@ -23,6 +23,12 @@ export class Enemy {
   dead: boolean;
   reachedEnd: boolean;
 
+  // Boss ability state
+  bossAddsSpawned: number;       // summon_adds: tracks how many 25% thresholds triggered
+  bossShieldActive: boolean;     // shield_phase: currently immune
+  bossShieldTimer: number;       // shield_phase: seconds remaining
+  bossShieldTriggered: boolean;  // shield_phase: already triggered at 50%
+
   constructor(def: EnemyDef, wave = 1, eliteMult = 1) {
     this.id = _nextId++;
     this.def = def;
@@ -41,6 +47,10 @@ export class Enemy {
     this.stunRemaining = 0;
     this.dead = false;
     this.reachedEnd = false;
+    this.bossAddsSpawned = 0;
+    this.bossShieldActive = false;
+    this.bossShieldTimer = 0;
+    this.bossShieldTriggered = false;
   }
 
   // ─── Elemental ─────────────────────────────────────────────────────────────
@@ -56,6 +66,9 @@ export class Enemy {
   }
 
   receiveDamage(baseDamage: number, element: ElementType): number {
+    // Shadow Titan shield phase: immune to all damage
+    if (this.bossShieldActive) return 0;
+
     const mult   = this.getElementMultiplier(element);
     const actual = Math.round(baseDamage * mult);
     const before = this.hp;
@@ -96,6 +109,12 @@ export class Enemy {
       return;
     }
 
+    // Boss shield phase countdown
+    if (this.bossShieldActive) {
+      this.bossShieldTimer -= dt;
+      if (this.bossShieldTimer <= 0) this.bossShieldActive = false;
+    }
+
     this.effects = this.effects.filter(e => { e.remaining -= dt; return e.remaining > 0; });
 
     const burnEff = this.effects.find(e => e.type === 'burn');
@@ -104,7 +123,9 @@ export class Enemy {
       if (this.hp <= 0) { this.dead = true; return; }
     }
 
-    const permMult = Math.max(CFG_PERM_SLOW_PER_STACK, 1 - this.permanentSlowStacks * CFG_PERM_SLOW_PER_STACK);
+    // Diminishing permanent slow: each stack multiplies by (1 - base), so total = (1-base)^stacks
+    // With base=0.08, 5 stacks → 66% speed, 10 stacks → 43%, 19 stacks → 20%
+    const permMult = Math.pow(1 - CFG_PERM_SLOW_PER_STACK, this.permanentSlowStacks);
     const tempEff  = this.effects.find(e => e.type === 'slow');
     const tempMult = tempEff ? (1 - tempEff.value) : 1;
 

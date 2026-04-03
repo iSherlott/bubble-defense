@@ -44,6 +44,7 @@ export interface EnemyDef {
   xp: number;
   description: string;
   isBoss?: boolean;
+  bossAbility?: 'summon_adds' | 'fire_trail' | 'shield_phase';
   golemType?: ElementType;   // elemental golem variant with special ability
   isElite?: boolean;         // elite unit (set at runtime, 10× power)
 }
@@ -80,6 +81,12 @@ export interface Talent {
   cost: number;
 }
 
+// ─── Multi-Element Damage ─────────────────────────────────────────────────────
+export interface DamageComponent {
+  element: ElementType;
+  amount: number;
+}
+
 // ─── Projectile ───────────────────────────────────────────────────────────────
 export interface ProjectileData {
   id: number;
@@ -89,6 +96,8 @@ export interface ProjectileData {
   speed: number;
   damage: number;
   element: ElementType;
+  /** Multi-element damage components. When present, overrides single damage+element for resolution. */
+  components?: DamageComponent[];
   towerId: number;
   color: string;
   dead: boolean;
@@ -99,7 +108,7 @@ export interface ProjectileData {
 }
 
 // ─── Game Screens ─────────────────────────────────────────────────────────────
-export type GameScreen = 'menu' | 'affinity' | 'archetype' | 'game' | 'levelup' | 'talent' | 'gameover' | 'bestiary';
+export type GameScreen = 'menu' | 'affinity' | 'archetype' | 'bonus' | 'game' | 'levelup' | 'talent' | 'gameover' | 'bestiary';
 // ─── Archetype System ────────────────────────────────────────────────────────
 export interface ArchetypeDef {
   id: string;

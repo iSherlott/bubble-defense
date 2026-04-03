@@ -1,4 +1,4 @@
-import type { ProjectileData, ElementType } from '../types';
+import type { ProjectileData, ElementType, DamageComponent } from '../types';
 import type { Enemy } from './Enemy';
 
 let _nextProjId = 1;
@@ -16,6 +16,7 @@ export function createProjectile(opts: {
   isCrit?: boolean;
   isMiss?: boolean;
   burnFromMagic?: boolean;
+  components?: DamageComponent[];
 }): ProjectileData {
   return {
     id: _nextProjId++,
@@ -25,6 +26,7 @@ export function createProjectile(opts: {
     speed: opts.isMagic ? 220 : 300,
     damage: opts.damage,
     element: opts.element,
+    components: opts.components,
     towerId: opts.towerId,
     color: opts.color,
     dead: false,

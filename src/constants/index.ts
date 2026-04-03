@@ -175,21 +175,24 @@ export const BOSS_DEFS: EnemyDef[] = [
     baseHp: 1200, speed: 70, agility: 12,
     immune: 'earth', halfElements: ['fire', 'wind'],
     color: '#228822', size: 34, baseLivesLost: 5, reward: 150, xp: 50,
-    description: 'Rei dos goblins. Imune a Terra.', isBoss: true,
+    description: 'Invoca goblins a cada 25% de HP perdido.', isBoss: true,
+    bossAbility: 'summon_adds',
   },
   {
     id: 'boss_chaos_dragon', name: 'Dragão Caótico',
     baseHp: 2000, speed: 50, agility: 8,
     immune: 'fire', halfElements: ['wind', 'earth'],
     color: '#cc2200', size: 42, baseLivesLost: 5, reward: 250, xp: 80,
-    description: 'Dragão ancestral. Imune ao Fogo.', isBoss: true,
+    description: 'Deixa rastro de fogo que queima torres próximas.', isBoss: true,
+    bossAbility: 'fire_trail',
   },
   {
     id: 'boss_shadow_titan', name: 'Titã das Sombras',
     baseHp: 3000, speed: 35, agility: 5,
     immune: 'water', halfElements: ['earth', 'fire'],
     color: '#330055', size: 50, baseLivesLost: 5, reward: 400, xp: 120,
-    description: 'Titã colossal. Imune à Água.', isBoss: true,
+    description: 'Fica imune por 3s ao chegar a 50% HP.', isBoss: true,
+    bossAbility: 'shield_phase',
   },
 ];
 
@@ -363,7 +366,7 @@ export const ITEM_DEFS: ItemDef[] = [
   { id:'gold_5x',      name:'Baú de Ouro',         icon:'🪙', rarity:'rare',
     description:'Cada inimigo dá +5 moedas.',    effectType:'gold_mult', effectValue:5 },
   { id:'gold_10x',     name:'Tesouro do Dragão',   icon:'👑', rarity:'legendary',
-    description:'Cada inimigo dá +10 moedas.',   effectType:'gold_mult', effectValue:10 },
+    description:'Cada inimigo dá +7 moedas.',   effectType:'gold_mult', effectValue:7 },
   { id:'slow_1s',      name:'Aura Gélida',         icon:'🧊', rarity:'legendary',
     description:'Inimigos surgem com 1s de lentidão.', effectType:'slow_aura', effectValue:1.0 },
   { id:'discount_1',   name:'Cupom de Desconto',   icon:'🏷', rarity:'common',
@@ -373,7 +376,7 @@ export const ITEM_DEFS: ItemDef[] = [
   { id:'discount_10',  name:'Mestre Mercador',     icon:'🎩', rarity:'rare',
     description:'10% de desconto em compras.',    effectType:'discount', effectValue:0.10 },
   { id:'discount_50',  name:'Pacto Demoníaco',     icon:'😈', rarity:'legendary',
-    description:'50% de desconto em compras.',    effectType:'discount', effectValue:0.50 },
+    description:'30% de desconto em compras.',    effectType:'discount', effectValue:0.30 },
 ];
 
 export const ITEM_RARITY_COLORS: Record<string, string> = {

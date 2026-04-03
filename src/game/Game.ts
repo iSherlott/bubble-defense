@@ -1,9 +1,10 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDef, ItemDropAnim } from '../types';
-import { TOWER_DEFS, CELL_SIZE, ELEMENT_COLORS,
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDef, ItemDropAnim, DamageComponent } from '../types';
+import { TOWER_DEFS, CELL_SIZE, ELEMENT_COLORS, ELEMENT_ICONS,
   BASE_LIVES, INITIAL_GOLD, BASE_TOWER_COST,
   UPGRADE_MULT_STEP, DUAL_MAGIC_BASE_CHANCE, DUAL_MAGIC_LUCK_BONUS,
   MAP_TIER_AT, MAX_TOWER_LEVEL, MAP_EXPAND_COST,
-  getFusionDef, ITEM_DEFS, ITEM_RARITY_COLORS, ARCHETYPE_DEFS } from '../constants';
+  getFusionDef, ITEM_DEFS, ITEM_RARITY_COLORS, ARCHETYPE_DEFS,
+  ENEMY_DEFS } from '../constants';
 import {
   CFG_EARTH_AOE_RADIUS, CFG_PUDDLE_RADIUS, CFG_PUDDLE_DURATION,
   CFG_WIND_PUSH_CELLS, CFG_BURN_PCT_PER_SEC, CFG_BURN_DURATION,
@@ -117,6 +118,7 @@ export class Game {
       case 'menu':      this.handleMenuClick(p); break;
       case 'affinity':  this.handleAffinityClick(p); break;
       case 'archetype': this.handleArchetypeClick(p); break;
+      case 'bonus':     this.handleBonusClick(p); break;
       case 'game':      this.handleGameClick(p); break;
       case 'levelup':   this.handleLevelUpClick(p); break;
       case 'talent':    this.handleTalentClick(p); break;
@@ -171,13 +173,49 @@ export class Game {
     const rects = this.renderer.getArchetypeRects();
     for (const [id, r] of rects) {
       if (this.hit(p, r)) {
-        this.startNewGame(this.pendingAffinity, id);
+        // Apply archetype but go to bonus distribution screen first
+        this.player = new Player();
+        this.player.affinity = this.pendingAffinity;
+        this.player.applyArchetype(id);
+        this.screen = 'bonus' as GameScreen;
         return;
       }
     }
     // Back button
     const back = this.renderer.getArchetypeBackRect();
     if (back && this.hit(p, back)) { this.screen = 'affinity'; return; }
+  }
+
+  private handleBonusClick(p: Vec2) {
+    const statBtns = this.renderer.getBonusStatBtns();
+    const keys: Array<'strength'|'intelligence'|'dexterity'|'agility'|'luck'|'vitality'> =
+      ['strength','intelligence','dexterity','agility','luck','vitality'];
+    for (const k of keys) {
+      const r = statBtns[k];
+      if (r && this.hit(p, r) && this.player.bonusPoints > 0) {
+        this.player.spendBonusPoint(k);
+        return;
+      }
+    }
+    // Start button (only if all bonus points spent)
+    const startBtn = this.renderer.getBonusStartBtn();
+    if (startBtn && this.hit(p, startBtn) && this.player.bonusPoints <= 0) {
+      this.startNewGameFromBonus();
+      return;
+    }
+    // Back button
+    const backBtn = this.renderer.getBonusBackBtn();
+    if (backBtn && this.hit(p, backBtn)) {
+      this.screen = 'archetype' as GameScreen;
+      return;
+    }
+  }
+
+  private startNewGameFromBonus() {
+    this.initState();
+    const seed = Date.now() & 0xffffff;
+    this.regenerateMap(0, seed);
+    this.screen = 'game';
   }
 
   private handleGameOverClick(p: Vec2) {
@@ -353,7 +391,7 @@ export class Game {
   /** Per-tower upgrade cost: baseCost × (1 + upgradeCount × 0.3), minus item discount */
   towerUpgradeCost(tower?: Tower): number {
     if (!tower) return 50; // fallback
-    const base = Math.round(tower.def.baseCost * (1 + tower.upgradeCount * 0.3));
+    const base = Math.round(tower.def.baseCost * (1 + tower.upgradeCount * 0.2));
     return Math.max(1, Math.round(base * (1 - this.getItemDiscount())));
   }
 
@@ -530,14 +568,17 @@ export class Game {
     this.itemDropAnim = { item, phase: 'rising', timer: 0, totalTime: 2.5 };
   }
 
-  /** Total bonus gold per kill from items */
+  /** Total bonus gold per kill from items (diminishing per stack: ×1, ×0.8, ×0.6) */
   getItemGoldBonus(): number {
     let bonus = 0;
+    const stackMult = [1.0, 0.8, 0.6];
     for (const owned of this.items) {
       const def = ITEM_DEFS.find(d => d.id === owned.defId);
-      if (def && def.effectType === 'gold_mult') bonus += def.effectValue * owned.stacks;
+      if (def && def.effectType === 'gold_mult') {
+        for (let s = 0; s < owned.stacks; s++) bonus += def.effectValue * (stackMult[s] ?? 0.6);
+      }
     }
-    return bonus;
+    return Math.round(bonus);
   }
 
   /** Total discount fraction from items (capped at 0.9) */
@@ -547,7 +588,7 @@ export class Game {
       const def = ITEM_DEFS.find(d => d.id === owned.defId);
       if (def && def.effectType === 'discount') disc += def.effectValue * owned.stacks;
     }
-    return Math.min(0.9, disc);
+    return Math.min(0.6, disc);
   }
 
   /** Total slow aura seconds from items */
@@ -560,11 +601,21 @@ export class Game {
     return slow;
   }
 
-  /** Synergy bonus: +15% damage when 2 towers share a cell (before fusion) */
+  /**
+   * Tiered synergy bonus based on minimum tower level on the cell:
+   *  - Both level 5+: +10% damage
+   *  - Both level 8+: +20% damage
+   *  - Both max level: +30% damage (pre-fusion peak)
+   * Falls back to flat +15% if only 2 towers present (legacy)
+   */
   getSynergyBonus(tower: Tower): number {
     const here = this.towersAt(tower.gridX, tower.gridY);
-    if (here.length >= 2) return CFG_SYNERGY_DAMAGE_BONUS;
-    return 0;
+    if (here.length < 2) return 0;
+    const minLevel = Math.min(...here.map(t => t.level));
+    if (minLevel >= MAX_TOWER_LEVEL + 1) return 0.30;  // both max level
+    if (minLevel >= 8) return 0.20;
+    if (minLevel >= 5) return 0.10;
+    return CFG_SYNERGY_DAMAGE_BONUS;  // default: 0.15
   }
 
   // ─── Map helpers ─────────────────────────────────────────────────────────────
@@ -689,7 +740,7 @@ export class Game {
     // Wave just completed → vitality life regen + item drop every 10 waves
     if (this.waveManager.waveComplete) {
       this.waveManager.waveComplete = false;  // consume the flag
-      const regen = Math.floor(this.player.stats.vitality * 0.1);
+      const regen = this.player.vitalityRegen();
       if (regen > 0) {
         this.lives = Math.min(BASE_LIVES, this.lives + regen);
         this.addFT({ x: this.map.gameWidth / 2, y: this.map.gameHeight / 2 }, `+${regen}❤ Vitalidade`, '#ff8888');
@@ -749,6 +800,9 @@ export class Game {
     for (const pu of this.puddles) pu.remaining -= dt;
     this.puddles = this.puddles.filter(p => p.remaining > 0);
 
+    // Boss abilities
+    this.processBossAbilities(dt);
+
     // Towers
     const extraProjs: ProjectileData[] = [];
     for (const tower of this.towers) {
@@ -756,12 +810,6 @@ export class Game {
       const speedB   = this.talentTree.speedBonusForElement(tower.def.element);
       const magicSpB = this.talentTree.magicSpeedBonusForElement(tower.def.element);
       const affM     = tower.computeAffinityMult(this.player.affinity);
-
-      if (tower.isSecondary) {
-        // Secondary towers gain mana only when the primary on the same cell shoots.
-        // This is handled below after the primary fires — skip here.
-        continue;
-      }
 
       if (!tower.canShoot(this.player.stats, speedB)) continue;
       const target = tower.findTarget(this.enemies);
@@ -776,11 +824,18 @@ export class Game {
       const critMult = isCrit ? this.player.critMultiplier() : 1;
       const dmg      = didHit ? baseDmg * critMult : 0;
 
+      // Fused towers split normal shot damage between both elements
+      const fusionComponents = tower.fusionDef && didHit ? [
+        { element: tower.fusionDef.primaryElement, amount: dmg * 0.5 },
+        { element: tower.fusionDef.secondaryElement, amount: dmg * 0.5 },
+      ] : undefined;
+
       this.projectiles.push(createProjectile({
         towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
         targetEnemyId: target.id, damage: dmg, element: tower.def.element,
-        color: didHit ? (isCrit ? '#ffff44' : tower.def.accentColor) : '#555555',
+        color: didHit ? (isCrit ? '#ffff44' : (tower.fusionDef?.color ?? tower.def.accentColor)) : '#555555',
         isCrit, isMiss: !didHit,
+        components: fusionComponents,
       }));
 
       const magicReady = tower.onNormalShot(this.player.stats, speedB, magicSpB);
@@ -788,23 +843,6 @@ export class Game {
         tower.consumeMagicBar();
         this.fireMagic(tower, affM, extraProjs);
         if (tower.dualMagic) this.fireMagic(tower, affM, extraProjs);
-      }
-
-      // Tick secondary tower on same cell — gains mana each time primary shoots
-      const secondary = this.towers.find(
-        t => t.isSecondary && t.gridX === tower.gridX && t.gridY === tower.gridY
-      );
-      if (secondary) {
-        const secMagicSpB = this.talentTree.magicSpeedBonusForElement(secondary.def.element);
-        const secAffM     = secondary.computeAffinityMult(this.player.affinity);
-        secondary.magicBar = Math.min(
-          secondary.def.magicBarMax,
-          secondary.magicBar + secondary.getEffectiveMagicBarGain(secMagicSpB)
-        );
-        if (secondary.magicBar >= secondary.def.magicBarMax) {
-          secondary.consumeMagicBar();
-          this.fireMagic(secondary, secAffM, extraProjs);
-        }
       }
     }
 
@@ -903,6 +941,12 @@ export class Game {
     const fusion = tower.fusionDef!;
     const baseDmg = tower.getMagicDamage(this.player.stats, affM) * fusion.magicDamageMult;
 
+    // Dual-element components: 60% primary, 40% secondary
+    const dualComponents = [
+      { element: fusion.primaryElement, amount: baseDmg * 0.6 },
+      { element: fusion.secondaryElement, amount: baseDmg * 0.4 },
+    ];
+
     // All fusion magics target enemies in range
     const targets = tower.findAllInRange(this.enemies);
     if (targets.length === 0) return;
@@ -919,6 +963,7 @@ export class Game {
             towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
             targetEnemyId: t.id, damage: baseDmg, element: fusion.primaryElement,
             color: fusion.color, isMagic: true, burnFromMagic: fusion.specialEffect === 'fireball_aoe' || fusion.specialEffect === 'magma_pool',
+            components: dualComponents,
           }));
         }
         this.renderer.triggerAoe(primary.pos.x, primary.pos.y, tower.getRange() * 0.6);
@@ -930,6 +975,7 @@ export class Game {
           towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
           targetEnemyId: primary.id, damage: baseDmg, element: 'fire',
           color: fusion.color, isMagic: true, burnFromMagic: true,
+          components: dualComponents,
         }));
         break;
       }
@@ -941,6 +987,7 @@ export class Game {
             towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
             targetEnemyId: t.id, damage: baseDmg, element: fusion.primaryElement,
             color: fusion.color, isMagic: true,
+            components: dualComponents,
           }));
           t.stunRemaining = Math.max(t.stunRemaining, 1.5);
         }
@@ -954,6 +1001,7 @@ export class Game {
             towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
             targetEnemyId: t.id, damage: baseDmg, element: fusion.primaryElement,
             color: fusion.color, isMagic: true,
+            components: dualComponents,
           }));
           t.addPermanentSlow();
           t.addPermanentSlow();
@@ -973,6 +1021,7 @@ export class Game {
             towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
             targetEnemyId: t.id, damage: baseDmg, element: 'water',
             color: fusion.color, isMagic: true,
+            components: dualComponents,
           }));
           t.stunRemaining = Math.max(t.stunRemaining, 1.0);
           t.addPermanentSlow();
@@ -987,6 +1036,7 @@ export class Game {
             towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
             targetEnemyId: t.id, damage: baseDmg, element: 'wind',
             color: fusion.color, isMagic: true,
+            components: dualComponents,
           }));
         }
         break;
@@ -998,6 +1048,7 @@ export class Game {
             towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
             targetEnemyId: t.id, damage: baseDmg, element: 'wind',
             color: fusion.color, isMagic: true,
+            components: dualComponents,
           }));
           if (t.def.golemType !== 'wind') {
             t.distanceTraveled = Math.max(0, t.distanceTraveled - WIND_PUSH_PX * 2);
@@ -1011,6 +1062,7 @@ export class Game {
           towerId: tower.id, startX: tower.pixelX, startY: tower.pixelY,
           targetEnemyId: primary.id, damage: baseDmg, element: fusion.primaryElement,
           color: fusion.color, isMagic: true,
+          components: dualComponents,
         }));
       }
     }
@@ -1018,12 +1070,70 @@ export class Game {
     this.addFT({ x: tower.pixelX, y: tower.pixelY - 20 }, `${fusion.icon} ${fusion.name}`, fusion.color);
   }
 
+  // ─── Boss Abilities ──────────────────────────────────────────────────────────
+  private processBossAbilities(dt: number) {
+    for (const e of this.enemies) {
+      if (e.dead || !e.def.isBoss || !e.def.bossAbility) continue;
+
+      switch (e.def.bossAbility) {
+        case 'summon_adds': {
+          // Goblin King: spawns 2 goblins at each 25% HP threshold (75%, 50%, 25%)
+          const thresholds = [0.75, 0.50, 0.25];
+          const hpFrac = e.hp / e.maxHp;
+          let shouldSpawn = 0;
+          for (const t of thresholds) {
+            if (hpFrac <= t) shouldSpawn++;
+          }
+          while (e.bossAddsSpawned < shouldSpawn) {
+            e.bossAddsSpawned++;
+            const goblinDef = ENEMY_DEFS.find(d => d.id === 'goblin')!;
+            for (let i = 0; i < 2; i++) {
+              const add = new Enemy(goblinDef, this.waveManager.currentWave, 1);
+              add.distanceTraveled = Math.max(0, e.distanceTraveled - 30 - i * 20);
+              add.pos = { ...e.pos };
+              this.enemies.push(add);
+              this.waveManager.totalEnemiesThisWave++;
+            }
+            this.addFT(e.pos, '👑 Invocação!', '#44ff44');
+          }
+          break;
+        }
+        case 'fire_trail': {
+          // Chaos Dragon: leaves burn puddles every ~2s (tracked via cooldown hack on stunRemaining)
+          // We reuse a simple timer approach
+          if (!('_trailTimer' in e)) (e as any)._trailTimer = 0;
+          (e as any)._trailTimer -= dt;
+          if ((e as any)._trailTimer <= 0) {
+            (e as any)._trailTimer = 2.0;
+            // Create a fire puddle (burns nearby enemies — acts as a danger zone)
+            this.puddles.push({
+              x: e.pos.x, y: e.pos.y, radius: 35,
+              remaining: 6, slowAmount: -0.10,  // negative = speed up (fire urgency), but we use it as indicator
+            });
+            this.addFT(e.pos, '🔥 Rastro!', '#ff4400');
+          }
+          break;
+        }
+        case 'shield_phase': {
+          // Shadow Titan: becomes immune for 3s when first reaching 50% HP
+          if (!e.bossShieldTriggered && e.hp <= e.maxHp * 0.5) {
+            e.bossShieldTriggered = true;
+            e.bossShieldActive = true;
+            e.bossShieldTimer = 3.0;
+            this.addFT(e.pos, '🛡 ESCUDO ATIVO!', '#aa44ff');
+          }
+          break;
+        }
+      }
+    }
+  }
+
   // ─── Hit Resolution ──────────────────────────────────────────────────────────
   /** Returns earth golem within 80px of enemy that can absorb damage, or null */
   private findEarthGolemShield(enemy: Enemy): Enemy | null {
     return this.enemies.find(e =>
       !e.dead && e !== enemy && e.def.golemType === 'earth' &&
-      Math.hypot(e.pos.x - enemy.pos.x, e.pos.y - enemy.pos.y) <= 80
+      Math.hypot(e.pos.x - enemy.pos.x, e.pos.y - enemy.pos.y) <= CFG_EARTH_GOLEM_SHIELD_RADIUS
     ) ?? null;
   }
 
@@ -1034,16 +1144,67 @@ export class Game {
     // Earth golem absorbs damage for nearby allies
     const shield = this.findEarthGolemShield(enemy);
     const actualTarget = shield ?? enemy;
-    const dmg = actualTarget.receiveDamage(proj.damage, proj.element);
-    const tw  = this.towers.find(t => t.id === proj.towerId);
-    if (tw) { tw.totalDamageDealt += dmg; if (actualTarget.dead) tw.totalKills++; }
-    if (shield) this.addFT(shield.pos, `🛡${Math.round(dmg)}`, '#aaaaff');
-    else this.addFT(enemy.pos, proj.isCrit ? `${Math.round(dmg)} CRÍTICO!` : String(Math.round(dmg)),
-      proj.isCrit ? '#ffff44' : proj.color);
+    const tw = this.towers.find(t => t.id === proj.towerId);
+
+    if (proj.components && proj.components.length > 0) {
+      // Multi-element damage: apply each component separately
+      let totalDealt = 0;
+      const parts: string[] = [];
+      for (const comp of proj.components) {
+        const d = actualTarget.receiveDamage(comp.amount, comp.element);
+        totalDealt += d;
+        if (d > 0) parts.push(`${Math.round(d)}${ELEMENT_COLORS[comp.element] === proj.color ? '' : comp.element[0]}`);
+      }
+      if (tw) { tw.totalDamageDealt += totalDealt; if (actualTarget.dead) tw.totalKills++; }
+      const label = parts.join('+') || '0';
+      if (shield) this.addFT(shield.pos, `🛡${label}`, '#aaaaff');
+      else this.addFT(enemy.pos, proj.isCrit ? `${label} CRÍTICO!` : label,
+        proj.isCrit ? '#ffff44' : proj.color);
+    } else {
+      // Single-element damage (original path)
+      const dmg = actualTarget.receiveDamage(proj.damage, proj.element);
+      if (tw) { tw.totalDamageDealt += dmg; if (actualTarget.dead) tw.totalKills++; }
+      if (shield) this.addFT(shield.pos, `🛡${Math.round(dmg)}`, '#aaaaff');
+      else this.addFT(enemy.pos, proj.isCrit ? `${Math.round(dmg)} CRÍTICO!` : String(Math.round(dmg)),
+        proj.isCrit ? '#ffff44' : proj.color);
+    }
   }
 
   private applyMagic(proj: ProjectileData, target: Enemy) {
     const tw = this.towers.find(t => t.id === proj.towerId);
+
+    // Multi-element magic: resolve each component, then apply effects from primary element
+    if (proj.components && proj.components.length > 0) {
+      let totalDealt = 0;
+      const parts: string[] = [];
+      for (const comp of proj.components) {
+        const d = target.receiveDamage(comp.amount, comp.element);
+        totalDealt += d;
+        if (d > 0) parts.push(`${Math.round(d)}${ELEMENT_ICONS[comp.element]}`);
+      }
+      if (tw) { tw.totalDamageDealt += totalDealt; if (target.dead) tw.totalKills++; }
+
+      // Apply element-specific effects for each component element
+      const elements = proj.components.map(c => c.element);
+      if (elements.includes('fire') && proj.burnFromMagic) {
+        target.applyBurn(CFG_BURN_PCT_PER_SEC, CFG_BURN_DURATION);
+      }
+      if (elements.includes('water')) {
+        target.addPermanentSlow();
+        if (Math.random() < this.talentTree.waterPuddleChance()) {
+          this.puddles.push({ x: target.pos.x, y: target.pos.y, radius: PUDDLE_RADIUS, remaining: PUDDLE_DURATION, slowAmount: CFG_PUDDLE_SLOW_AMOUNT });
+        }
+      }
+      if (elements.includes('wind') && target.def.golemType !== 'wind') {
+        target.distanceTraveled = Math.max(0, target.distanceTraveled - WIND_PUSH_PX * 0.5);
+      }
+      // Earth AoE is handled at the fusion level (fireFusionMagic already does AoE targeting)
+
+      this.addFT(target.pos, `✨${parts.join('+')}`, proj.color);
+      return;
+    }
+
+    // Single-element magic (original path)
     const c  = ELEMENT_COLORS[proj.element];
 
     switch (proj.element) {
