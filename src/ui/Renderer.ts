@@ -1,4 +1,4 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, Stats } from '../types';
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim } from '../types';
 import type { BaseTower as Tower } from '../entities/BaseTower';
 import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
 import type { Player } from '../player/Player';

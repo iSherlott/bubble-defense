@@ -87,7 +87,7 @@ export const galeInsigniaEffect: ItemEffect = {
 export const golemHunterEffect: ItemEffect = {
   id: 'golem_hunter',
   modifyHunterDmg(enemy: BaseEnemy, stacks: number) {
-    const isTarget = enemy._elite || enemy.def.isBoss || enemy.def.golemType != null;
+    const isTarget = enemy.isElite || enemy.def.isBoss || enemy.def.golemType != null;
     return isTarget ? 1 + 0.18 * stacks : 1;
   },
 };

@@ -7,7 +7,7 @@ import type { UpgradePopup } from '../game/Game';
 import type { MapData } from '../game/MapGenerator';
 import { CELL_SIZE, SIDEBAR_W, WAVE_BAR_H,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS,
-  MAX_LEVEL, TALENT_POINT_EVERY, MAX_TOWER_LEVEL, MAP_EXPAND_COST,
+  MAX_LEVEL, TALENT_POINT_EVERY, MAP_EXPAND_COST,
   ITEM_RARITY_COLORS,
   ITEM_RARITY_NAMES } from '../constants';
 import { GameConfig } from '../config';
@@ -422,7 +422,7 @@ export class GameRenderer {
     ctx.strokeStyle = ELEMENT_COLORS[aff] + '88'; ctx.lineWidth = 1;
     rr(ctx, sx + 8, y, sw - 16, 22, 6); ctx.stroke();
     ctx.fillStyle = ELEMENT_COLORS[aff]; ctx.font = 'bold 10px Segoe UI';
-    const map = state.game.waveManager; // reuse for tier info
+    // tier info rendered inline
     ctx.fillText(`${ELEMENT_ICONS[aff]} Aptidão: ${ELEMENT_NAMES[aff]} (2×)  |  Tier: ${state.game.currentMapTier + 1}`, sx + 12, y + 15);
     y += 30;
 

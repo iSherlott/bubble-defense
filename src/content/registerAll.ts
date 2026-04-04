@@ -46,6 +46,7 @@ import {
 } from '../behaviors/ItemEffects';
 
 import type { MagicBehavior, FusionBehavior } from '../behaviors/types';
+import { registerEnemyRenderProfiles } from './enemyRenderProfiles';
 
 // ─── Magic behavior map ────────────────────────────────────────────────────────
 const magicBehaviors: Record<string, MagicBehavior> = {
@@ -114,7 +115,7 @@ export function registerAllContent(): void {
   for (const def of TOWER_DEFS) {
     towerRegistry.register({
       def,
-      magicBehavior: magicBehaviors[def.element] ?? magicBehaviors.fire,
+      magicBehavior: magicBehaviors[def.magicBehaviorId ?? def.element] ?? magicBehaviors.fire,
     });
   }
 
@@ -149,4 +150,7 @@ export function registerAllContent(): void {
     const effect = itemEffects[def.id] ?? { id: def.id };
     itemRegistry.register(def, effect);
   }
+
+  // ── Enemy Render Profiles ──────────────────────────────────────────────────
+  registerEnemyRenderProfiles();
 }

@@ -132,7 +132,7 @@ export class CombatSystem {
     ) ?? null;
   }
 
-  private onHit(ctx: IGameContext, proj: ProjectileData, enemy: BaseEnemy, extra: ProjectileData[]): void {
+  private onHit(ctx: IGameContext, proj: ProjectileData, enemy: BaseEnemy, _extra: ProjectileData[]): void {
     if (proj.isMiss) { ctx.addFT(enemy.pos, 'MISS', '#666666'); return; }
     if (proj.isMagic) { this.applyMagic(ctx, proj, enemy); return; }
 
@@ -263,7 +263,7 @@ export class CombatSystem {
           ctx.addFT(t.pos, `🌍${Math.round(d)}`, c);
           if (this.itemSystem.hasEffect('earth_sandstorm', items)) {
             t.applyTempSlow(0.20, 5);
-            t._sandstormAcc = { amount: 0.15, remaining: 5 };
+            t.sandstormAcc = { amount: 0.15, remaining: 5 };
           }
         }
         ctx.triggerAoeFlash(target.pos.x, target.pos.y, aoeR);

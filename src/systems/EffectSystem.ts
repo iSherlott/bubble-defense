@@ -48,9 +48,9 @@ export class EffectSystem {
     const hasRelic = ctx.items.some(i => i.defId === 'cataclysm_relic');
     if (!hasRelic || !ctx.waveManager.waveActive) return;
 
-    ctx.cataclysmTimer += dt;
-    if (ctx.cataclysmTimer >= 20) {
-      ctx.cataclysmTimer = 0;
+    ctx.itemState.cataclysmTimer += dt;
+    if (ctx.itemState.cataclysmTimer >= 20) {
+      ctx.itemState.cataclysmTimer = 0;
       this.fireCataclysm(ctx);
     }
   }

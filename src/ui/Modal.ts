@@ -2,7 +2,7 @@ import type { Enemy } from '../entities/Enemy';
 import type { Tower } from '../entities/Tower';
 import type { Stats } from '../types';
 import type { TalentTree } from '../player/TalentTree';
-import { ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS, STAT_LABELS, MAX_TOWER_LEVEL } from '../constants';
+import { ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS, MAX_TOWER_LEVEL } from '../constants';
 
 export class Modal {
   private overlay: HTMLElement;

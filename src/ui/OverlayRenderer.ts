@@ -1,4 +1,4 @@
-import type { ElementType } from '../types';
+// types used indirectly via Player/TalentTree
 import type { Player } from '../player/Player';
 import type { SkillTree as TalentTree } from '../player/SkillTree';
 import { STAT_LABELS, STAT_DESCRIPTIONS, STAT_ICONS,
@@ -180,7 +180,7 @@ export class OverlayRenderer {
     ctx: CanvasRenderingContext2D,
     cw: number, ch: number,
     node: { name: string; description: string; element: string; requires: string[]; requiredLevel: number; cost: number; purchased: boolean },
-    talentPoints: number,
+    _talentPoints: number,
     canBuy: boolean,
     elColor: Record<string, string>,
   ) {

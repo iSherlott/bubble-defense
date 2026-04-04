@@ -1,4 +1,4 @@
-import type { Stats, StatKey, ElementType, ArchetypeDef } from '../types';
+import type { Stats, StatKey, ElementType } from '../types';
 import { XP_TABLE, MAX_LEVEL, TALENT_POINT_EVERY,
   MIN_STAT_VALUE, STARTING_STAT_TOTAL, ARCHETYPE_DEFS } from '../constants';
 import { GameConfig } from '../config';

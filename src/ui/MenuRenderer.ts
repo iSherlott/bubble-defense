@@ -63,7 +63,7 @@ export class MenuRenderer {
     ctx.fillText('Clique direito → detalhes  |  P = pausar  |  Custo inicial: 80g (multiplica por torres colocadas)', cw / 2, 520);
   }
 
-  renderAffinity(ctx: CanvasRenderingContext2D, cw: number, ch: number, player: Player) {
+  renderAffinity(ctx: CanvasRenderingContext2D, cw: number, ch: number, _player: Player) {
     ctx.fillStyle = '#09091c'; ctx.fillRect(0, 0, cw, ch);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ddddff'; ctx.font = 'bold 36px Segoe UI';

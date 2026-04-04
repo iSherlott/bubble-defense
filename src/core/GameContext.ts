@@ -5,6 +5,7 @@ import type { Player } from '../player/Player';
 import type { SkillTree } from '../player/SkillTree';
 import type { WaveManager } from '../game/WaveManager';
 import type { MapData } from '../game/MapGenerator';
+import type { AnimationSystem } from '../systems/AnimationSystem';
 
 // ─── Shared Types (moved from Game.ts) ──────────────────────────────────────
 
@@ -20,9 +21,23 @@ export interface BurnZone {
 /**
  * Shared game context that all systems can read/write.
  * Implemented by the Game class.
+ *
+ * Convention: entity arrays and scalar state are directly mutable by systems.
+ * Readonly references (map, player, talentTree, waveManager, animations) should
+ * only be replaced by Game itself during lifecycle transitions (new game, load).
  */
+
+/** Grouped item-related runtime state */
+export interface ItemState {
+  titanShieldCharges: number;
+  titanShieldWaves: number;
+  cataclysmTimer: number;
+  lastTronoWave: number;
+  lastItemWave: number;
+}
+
 export interface IGameContext {
-  // Entity arrays
+  // Entity arrays (mutable by systems)
   enemies: BaseEnemy[];
   towers: BaseTower[];
   projectiles: ProjectileData[];
@@ -30,24 +45,21 @@ export interface IGameContext {
   burnZones: BurnZone[];
   floatingTexts: FloatingText[];
 
-  // Game state
+  // Game scalars (mutable by systems)
   gold: number;
   lives: number;
   score: number;
   items: OwnedItem[];
 
-  // Special item state
-  titanShieldCharges: number;
-  titanShieldWaves: number;
-  cataclysmTimer: number;
-  _lastTronoWave: number;
-  lastItemWave: number;
+  // Item-specific runtime state (grouped)
+  readonly itemState: ItemState;
 
-  // References
+  // Immutable references (set only by Game during lifecycle)
   readonly map: MapData;
   readonly player: Player;
   readonly talentTree: SkillTree;
   readonly waveManager: WaveManager;
+  readonly animations: AnimationSystem;
 
   // Item drop animation
   itemDropAnim: ItemDropAnim | null;

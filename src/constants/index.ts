@@ -134,7 +134,7 @@ export const GOLEM_DEFS: EnemyDef[] = [
     immune: 'water', halfElements: ['wind', 'earth'],
     color: '#cc4400', size: 20, baseLivesLost: 2, reward: 35, xp: 12,
     description: 'Imune a qualquer dano com componente de Fogo.',
-    golemType: 'fire',
+    golemType: 'fire', renderProfileId: 'golem',
   },
   {
     id: 'golem_water', name: 'Golem de Água',
@@ -142,7 +142,7 @@ export const GOLEM_DEFS: EnemyDef[] = [
     immune: 'fire', halfElements: ['earth', 'wind'],
     color: '#0055cc', size: 20, baseLivesLost: 2, reward: 35, xp: 12,
     description: 'Se curar em poças: +0.01% HP máx/s dentro da poça.',
-    golemType: 'water',
+    golemType: 'water', renderProfileId: 'golem',
   },
   {
     id: 'golem_earth', name: 'Golem de Terra',
@@ -150,7 +150,7 @@ export const GOLEM_DEFS: EnemyDef[] = [
     immune: 'wind', halfElements: ['fire', 'water'],
     color: '#665500', size: 22, baseLivesLost: 3, reward: 40, xp: 14,
     description: 'Absorve dano das unidades próximas (raio 80px).',
-    golemType: 'earth',
+    golemType: 'earth', renderProfileId: 'golem',
   },
   {
     id: 'golem_wind', name: 'Golem de Vento',
@@ -158,7 +158,7 @@ export const GOLEM_DEFS: EnemyDef[] = [
     immune: 'earth', halfElements: ['fire', 'water'],
     color: '#44aa77', size: 19, baseLivesLost: 2, reward: 35, xp: 12,
     description: 'Imune ao empurrão do Vento.',
-    golemType: 'wind',
+    golemType: 'wind', renderProfileId: 'golem',
   },
 ];
 
@@ -169,7 +169,7 @@ export const BOSS_DEFS: EnemyDef[] = [
     immune: 'earth', halfElements: ['fire', 'wind'],
     color: '#228822', size: 34, baseLivesLost: 5, reward: 150, xp: 50,
     description: 'Invoca goblins a cada 25% de HP perdido.', isBoss: true,
-    bossAbility: 'summon_adds',
+    bossAbility: 'summon_adds', renderProfileId: 'goblin',
   },
   {
     id: 'boss_chaos_dragon', name: 'Dragão Caótico',
@@ -177,7 +177,7 @@ export const BOSS_DEFS: EnemyDef[] = [
     immune: 'fire', halfElements: ['wind', 'earth'],
     color: '#cc2200', size: 42, baseLivesLost: 5, reward: 250, xp: 80,
     description: 'Deixa rastro de fogo que queima torres próximas.', isBoss: true,
-    bossAbility: 'fire_trail',
+    bossAbility: 'fire_trail', renderProfileId: 'dragon',
   },
   {
     id: 'boss_shadow_titan', name: 'Titã das Sombras',
@@ -185,7 +185,7 @@ export const BOSS_DEFS: EnemyDef[] = [
     immune: 'water', halfElements: ['earth', 'fire'],
     color: '#330055', size: 50, baseLivesLost: 5, reward: 400, xp: 120,
     description: 'Fica imune por 3s ao chegar a 50% HP.', isBoss: true,
-    bossAbility: 'shield_phase',
+    bossAbility: 'shield_phase', renderProfileId: 'golem',
   },
 ];
 
