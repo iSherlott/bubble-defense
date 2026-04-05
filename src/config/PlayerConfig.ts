@@ -1,7 +1,7 @@
 // ─── Player Stats & Leveling Configuration ───────────────────────────────────
 export class PlayerConfig {
   // Leveling
-  readonly maxLevel          = 50;
+  readonly maxLevel          = 100;
   readonly talentPointEvery  = 10;  // earn 1 talent point per N levels
 
   // Starting stats

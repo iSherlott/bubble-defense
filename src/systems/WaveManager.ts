@@ -155,14 +155,30 @@ export class WaveManager {
     if (isBoss) {
       const bossDefs = enemyRegistry.getBossDefs();
       const bossIdx = Math.max(0, Math.floor((wave - this.rules.bossEveryN) / this.rules.bossEveryN)) % bossDefs.length;
-      return [{ typeId: bossDefs[bossIdx].id, count: 1, timer: 0, spawned: 0, isBoss: true, isElite: false }];
+      return [{ typeId: bossDefs[bossIdx].id, count: 1, timer: 300, spawned: 0, isBoss: true, isElite: false }];
     }
 
     const pool = getEnemyPool(wave, this.rules);
     const typeCount = Math.min(typeCountForWave(wave, this.rules), pool.length);
+
+    // Collect preferred types from any matching archetype hint
+    const hints = this.rules.archetypeHints ?? [];
+    const preferred = hints
+      .filter(h => wave >= h.fromWave && wave <= h.toWave)
+      .flatMap(h => h.preferredTypeIds)
+      .filter(id => pool.includes(id));
+    const uniquePreferred = [...new Set(preferred)];
+
+    // Fill chosen: prioritise preferred, then random from remainder
     const chosen: string[] = [];
     const poolCopy = [...pool];
-    for (let i = 0; i < typeCount; i++) {
+    for (const id of uniquePreferred) {
+      if (chosen.length >= typeCount) break;
+      const idx = poolCopy.indexOf(id);
+      if (idx !== -1) { chosen.push(poolCopy.splice(idx, 1)[0]); }
+    }
+    // Fill remaining slots randomly
+    while (chosen.length < typeCount && poolCopy.length > 0) {
       const idx = Math.floor(rng() * poolCopy.length);
       chosen.push(poolCopy.splice(idx, 1)[0]);
     }
@@ -170,8 +186,8 @@ export class WaveManager {
     const totalCount = Math.round(cfg.enemy.waveBaseCount + wave * cfg.enemy.waveCountPerWave);
     const perType = Math.max(1, Math.round(totalCount / chosen.length));
 
-    const queues: SpawnQueue[] = chosen.map(typeId => ({
-      typeId, count: perType, timer: 0, spawned: 0, isBoss: false, isElite: false,
+    const queues: SpawnQueue[] = chosen.map((typeId, i) => ({
+      typeId, count: perType, timer: i === 0 ? 300 : 0, spawned: 0, isBoss: false, isElite: false,
     }));
 
     const elites = eliteCountForWave(wave);

@@ -45,6 +45,9 @@ export abstract class BaseTower extends BaseEntity {
   totalDamageDealt: number;
   totalKills: number;
 
+  /** Remaining seconds this tower is disabled by a disabler enemy aura */
+  disabledTimer: number;
+
   constructor(def: TowerDef, gridX: number, gridY: number, slotIndex: 0 | 1 = 0) {
     super();
     this.id = nextEntityId();
@@ -75,6 +78,7 @@ export abstract class BaseTower extends BaseEntity {
     this.magicBar = 0;
     this.totalDamageDealt = 0;
     this.totalKills = 0;
+    this.disabledTimer = 0;
   }
 
   // ─── Level ──────────────────────────────────────────────────────────────────
@@ -158,10 +162,16 @@ export abstract class BaseTower extends BaseEntity {
   // ─── Shooting ───────────────────────────────────────────────────────────────
   update(dt: number) {
     if (this.cooldown > 0) this.cooldown -= dt;
+    if (this.disabledTimer > 0) this.disabledTimer -= dt;
   }
 
   canShoot(): boolean {
-    return this.cooldown <= 0;
+    return this.cooldown <= 0 && this.disabledTimer <= 0;
+  }
+
+  /** Whether the tower is currently disabled by a disabler enemy aura */
+  get isDisabled(): boolean {
+    return this.disabledTimer > 0;
   }
 
   onNormalShot(stats: Stats, talentSpeedBonus: number, talentMagicSpeedBonus: number): boolean {

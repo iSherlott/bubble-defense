@@ -62,6 +62,8 @@ export interface EnemyDef {
   behaviorIds?: string[];
   golemType?: ElementType;   // elemental golem variant with special ability
   isElite?: boolean;         // elite unit (set at runtime, 10× power)
+  /** Element type of disabler aura — disables towers of this element */
+  disablerElement?: ElementType;
   /** Render profile ID for visual appearance. Defaults to enemy id if not set. */
   renderProfileId?: string;
 }

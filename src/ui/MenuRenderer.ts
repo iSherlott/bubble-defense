@@ -48,10 +48,14 @@ export class MenuRenderer {
     drawButton(ctx, lg, '💾  Carregar Save', hasS ? '#1a3a1a' : '#1a1a2a', hasS ? '#55cc55' : '#445566');
     this.menuBtns['loadGame'] = lg;
 
+    const bestR = { x: bx, y: 376, w: bw, h: bh };
+    drawButton(ctx, bestR, '📖  Mostruário', '#0d0d22', '#8888cc');
+    this.menuBtns['bestiary'] = bestR;
+
     const elems: ElementType[] = ['fire', 'water', 'earth', 'wind'];
     const ew = 192, eh = 74, gap = 8, tw = elems.length * (ew + gap) - gap;
     elems.forEach((el, i) => {
-      const rx = cw / 2 - tw / 2 + i * (ew + gap), ry = 400;
+      const rx = cw / 2 - tw / 2 + i * (ew + gap), ry = 460;
       ctx.fillStyle = ELEMENT_COLORS[el] + '22'; ctx.strokeStyle = ELEMENT_COLORS[el] + '88';
       ctx.lineWidth = 1; roundedRect(ctx, rx, ry, ew, eh, 8); ctx.fill(); ctx.stroke();
       ctx.fillStyle = ELEMENT_COLORS[el]; ctx.font = '24px serif'; ctx.fillText(ELEMENT_ICONS[el], rx + 24, ry + 42);
@@ -60,7 +64,7 @@ export class MenuRenderer {
       ctx.fillText('vs ' + ELEMENT_NAMES[OPPOSITE_ELEMENT[el]], rx + ew / 2 + 12, ry + 46);
     });
     ctx.fillStyle = '#444466'; ctx.font = '12px Segoe UI';
-    ctx.fillText('Clique direito → detalhes  |  P = pausar  |  Custo inicial: 80g (multiplica por torres colocadas)', cw / 2, 520);
+    ctx.fillText('Clique direito → detalhes  |  P = pausar  |  Custo inicial: 80g (multiplica por torres colocadas)', cw / 2, 580);
   }
 
   renderAffinity(ctx: CanvasRenderingContext2D, cw: number, ch: number, _player: Player) {

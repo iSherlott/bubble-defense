@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { TOWER_DEFS } from './towers';
-import { ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS } from './enemies';
+import { ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS, DISABLER_DEFS } from './enemies';
 import { FUSION_DEFS } from './fusions';
 import { ITEM_DEFS } from './items';
 import {
@@ -30,7 +30,30 @@ import {
 
 // ── Enemy Behaviors ──
 import {
+  // Standard enemy tactical behaviors
+  FlightInstinctBehavior,
+  ThickHideBehavior,
+  LateralBurstBehavior,
+  DefensiveAuraBehavior,
+  TidalRiteBehavior,
+  UpcurrentBehavior,
+  ReactiveShadowBehavior,
+  ElementalTrailBehavior,
+  // Golem anchor behaviors
+  FireAnchorBehavior,
+  WaterAnchorBehavior,
+  EarthAnchorBehavior,
+  WindAnchorBehavior,
+  // Legacy boss behaviors (kept for registry; no longer on bosses)
   SummonAddsBehavior, FireTrailBehavior, ShieldPhaseBehavior,
+  // Disabler (updated with secondary effects)
+  DisablerAuraBehavior,
+  // New boss behaviors
+  ForgeColossusBehavior,
+  TidalLeviathanBehavior,
+  StormQueenBehavior,
+  AbyssGuardianBehavior,
+  PrismaticAvatarBehavior,
 } from '../behaviors/EnemyBehaviors';
 
 // ── Item Effects ──
@@ -108,9 +131,37 @@ const itemEffects: Record<string, import('../behaviors/types').ItemEffect> = {
 // ─── Enemy behavior instances ──────────────────────────────────────────────
 // Register all behaviors in the behavior registry so they can be looked up by ID.
 // To add a new behavior: create the class, instantiate it here, call registerEnemyBehavior().
+
+// Standard enemy tactical behaviors
+registerEnemyBehavior(new FlightInstinctBehavior());
+registerEnemyBehavior(new ThickHideBehavior());
+registerEnemyBehavior(new LateralBurstBehavior());
+registerEnemyBehavior(new DefensiveAuraBehavior());
+registerEnemyBehavior(new TidalRiteBehavior());
+registerEnemyBehavior(new UpcurrentBehavior());
+registerEnemyBehavior(new ReactiveShadowBehavior());
+registerEnemyBehavior(new ElementalTrailBehavior());
+
+// Golem anchor behaviors
+registerEnemyBehavior(new FireAnchorBehavior());
+registerEnemyBehavior(new WaterAnchorBehavior());
+registerEnemyBehavior(new EarthAnchorBehavior());
+registerEnemyBehavior(new WindAnchorBehavior());
+
+// Legacy boss behaviors (kept for backward compatibility)
 registerEnemyBehavior(new SummonAddsBehavior());
 registerEnemyBehavior(new FireTrailBehavior());
 registerEnemyBehavior(new ShieldPhaseBehavior());
+
+// Disabler (with secondary effects)
+registerEnemyBehavior(new DisablerAuraBehavior());
+
+// New boss behaviors
+registerEnemyBehavior(new ForgeColossusBehavior());
+registerEnemyBehavior(new TidalLeviathanBehavior());
+registerEnemyBehavior(new StormQueenBehavior());
+registerEnemyBehavior(new AbyssGuardianBehavior());
+registerEnemyBehavior(new PrismaticAvatarBehavior());
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -154,7 +205,7 @@ export function registerAllContent(): void {
   }
 
   // ── Enemies (all types — standard, golems, bosses) ─────────────────────────
-  const allEnemyDefs = [...ENEMY_DEFS, ...GOLEM_DEFS, ...BOSS_DEFS];
+  const allEnemyDefs = [...ENEMY_DEFS, ...GOLEM_DEFS, ...DISABLER_DEFS, ...BOSS_DEFS];
   for (const def of allEnemyDefs) {
     enemyRegistry.register({ def, behaviors: resolveBehaviors(def) });
   }

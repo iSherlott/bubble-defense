@@ -213,7 +213,7 @@ export class OverlayRenderer {
     ctx.textAlign = 'center';
   }
 
-  renderBestiary(ctx: CanvasRenderingContext2D, cw: number, ch: number) {
+  renderBestiary(ctx: CanvasRenderingContext2D, cw: number, ch: number, returnScreen = 'game') {
     this.bestiaryRects = {};
     ctx.fillStyle = '#080814'; ctx.fillRect(0, 0, cw, ch);
     ctx.textAlign = 'center';
@@ -324,18 +324,19 @@ export class OverlayRenderer {
         ctx.fillStyle = '#6688aa'; ctx.font = '10px Segoe UI';
         wrapTextLeft(ctx, def.description, bx + 8, by + 75, bw - 16, 13);
         const abilities: Record<string, string> = {
-          fire: '🔥 Cura por dano recebido',
-          water: '💧 Cura em poças de água',
-          earth: '🌍 Absorve dano de aliados próximos',
-          wind: '💨 Imune ao empurrão'
+          fire: '🔥 Âncora ofensiva: aliados em 130px ficam 12% mais rápidos',
+          water: '💧 Âncora de sustain: a cada 3.5s cura aliados em 110px (1.8% HP)',
+          earth: '🌍 Âncora defensiva: aliados em 100px recebem 18% menos dano',
+          wind: '💨 Âncora de ritmo: rajadas periódicas (+25% velocidade por 1.5s)',
         };
         ctx.fillStyle = ec; ctx.font = 'bold 9px Segoe UI';
         ctx.fillText(abilities[def.golemType!] ?? '', bx + 8, by + bh - 12);
       });
     }
 
+    const backLabel = returnScreen === 'menu' ? '← Voltar ao Menu' : '← Voltar ao Jogo';
     const backR = { x: 20, y: ch - 50, w: 180, h: 34 };
-    drawButton(ctx, backR, '← Voltar ao Jogo', '#1a1a2e', '#6666aa');
+    drawButton(ctx, backR, backLabel, '#1a1a2e', '#6666aa');
     this.bestiaryRects['back'] = backR;
     ctx.textAlign = 'center';
   }

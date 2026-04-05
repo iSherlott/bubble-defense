@@ -8,6 +8,16 @@ import { enemyRegistry } from '../registries';
 export class EnemyBehaviorSystem {
 
   update(ctx: IGameContext, dt: number): void {
+    // Reset per-frame transient modifiers BEFORE any behavior can set them.
+    // This ensures anchor/aura effects expire when the source dies or moves away.
+    for (const e of ctx.enemies) {
+      if (!e.dead) {
+        e.tempDamageReduction = 0;
+        e.tempSpeedBoost      = 1;
+        e.resistedElement     = null;
+      }
+    }
+
     for (const e of ctx.enemies) {
       if (e.dead) continue;
 

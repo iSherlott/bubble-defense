@@ -66,7 +66,7 @@ export class GameInputController {
     const g = this.game;
     if (e.key === 'Escape') {
       if (g.screen === 'talent')   { g.requestScreen('game'); return; }
-      if (g.screen === 'bestiary') { g.requestScreen('game'); return; }
+      if (g.screen === 'bestiary') { g.requestScreen(g.bestiaryReturnScreen); return; }
       if (g.screen === 'game') {
         if (g.movingTower)  { g.movingTower = null; return; }
         if (g.upgradePopup) { g.upgradePopup = null; return; }
@@ -86,6 +86,10 @@ export class GameInputController {
     const b = g.renderer.getMenuButtonRects();
     if (b['newGame']  && this.hit(p, b['newGame']))  g.requestScreen('affinity');
     if (b['loadGame'] && this.hit(p, b['loadGame']) && g.hasSaveAvailable()) g.loadGameFromSave();
+    if (b['bestiary'] && this.hit(p, b['bestiary'])) {
+      g.bestiaryReturnScreen = 'menu';
+      g.requestScreen('bestiary');
+    }
   }
 
   private handleAffinityClick(p: Vec2) {
@@ -155,7 +159,7 @@ export class GameInputController {
   private handleBestiaryClick(p: Vec2) {
     const g = this.game;
     const b = g.renderer.getBestiaryRects();
-    if (b['back'] && this.hit(p, b['back'])) { g.requestScreen('game'); return; }
+    if (b['back'] && this.hit(p, b['back'])) { g.requestScreen(g.bestiaryReturnScreen); return; }
     g.renderer.handleBestiaryTabClick(p, this.hit.bind(this));
   }
 
@@ -203,10 +207,10 @@ export class GameInputController {
       return;
     }
     if (ui['autoWave']    && this.hit(p, ui['autoWave']))    { g.autoWave = !g.autoWave; return; }
-    if (ui['speedToggle'] && this.hit(p, ui['speedToggle'])) { g.gameSpeed = g.gameSpeed === 1 ? 2 : 1; return; }
+    if (ui['speedToggle'] && this.hit(p, ui['speedToggle'])) { g.gameSpeed = g.gameSpeed === 1 ? 2 : g.gameSpeed === 2 ? 4 : 1; return; }
     if (ui['talentBtn']   && this.hit(p, ui['talentBtn']))   { g.requestScreen('talent'); return; }
     if (ui['expandMap']   && this.hit(p, ui['expandMap']))   { g.expandMap(); return; }
-    if (ui['bestiary']    && this.hit(p, ui['bestiary']))    { g.requestScreen('bestiary'); return; }
+    if (ui['bestiary']    && this.hit(p, ui['bestiary']))    { g.bestiaryReturnScreen = 'game'; g.requestScreen('bestiary'); return; }
     for (const [id, r] of g.renderer.getTowerSelectionRects()) {
       if (this.hit(p, r)) {
         g.selectedTowerType = g.selectedTowerType === id ? '' : id;
