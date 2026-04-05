@@ -23,7 +23,7 @@ export function createProjectile(opts: {
     x: opts.startX,
     y: opts.startY,
     targetEnemyId: opts.targetEnemyId,
-    speed: opts.isMagic ? 220 : 300,
+    speed: opts.isMagic ? 330 : 450,
     damage: opts.damage,
     element: opts.element,
     components: opts.components,

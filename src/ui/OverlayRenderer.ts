@@ -4,7 +4,7 @@ import type { SkillTree as TalentTree } from '../player/SkillTree';
 import { STAT_LABELS, STAT_DESCRIPTIONS, STAT_ICONS,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS,
   TALENT_POINT_EVERY } from '../constants';
-import { towerRegistry, enemyRegistry } from '../registries';
+import { towerRegistry, enemyRegistry, evolutionRegistry } from '../registries';
 import type { Rect } from './RenderUtils';
 import { drawButton, roundedRect, mulberry32, wrapText, wrapTextLeft } from './RenderUtils';
 
@@ -14,6 +14,8 @@ export class OverlayRenderer {
   private talentBackRect: Rect | null = null;
   private bestiaryRects: Record<string, Rect> = {};
   private bestiaryPage = 0;
+  private bestiaryScroll = 0;
+  private bestiaryContentH = 0;
   private gameOverBtns: Record<string, Rect> = {};
   private _mousePos: { x: number; y: number } | null = null;
 
@@ -27,8 +29,14 @@ export class OverlayRenderer {
   handleBestiaryTabClick(p: { x: number; y: number }, hit: (p: { x: number; y: number }, r: { x: number; y: number; w: number; h: number }) => boolean) {
     for (let i = 0; i < 3; i++) {
       const r = this.bestiaryRects[`tab_${i}`];
-      if (r && hit(p, r)) { this.bestiaryPage = i; break; }
+      if (r && hit(p, r)) { this.bestiaryPage = i; this.bestiaryScroll = 0; break; }
     }
+  }
+
+  handleBestiaryWheel(deltaY: number, viewH: number) {
+    const startY = 88;
+    const maxScroll = Math.max(0, this.bestiaryContentH - (viewH - startY - 60));
+    this.bestiaryScroll = Math.max(0, Math.min(maxScroll, this.bestiaryScroll + deltaY * 0.5));
   }
 
   renderLevelUp(ctx: CanvasRenderingContext2D, cw: number, ch: number, player: Player) {
@@ -237,12 +245,22 @@ export class OverlayRenderer {
     });
 
     const startY = 88;
+    const scrollY = this.bestiaryScroll;
+
+    // Clip content area below tabs
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, startY, cw, ch - startY - 60);
+    ctx.clip();
 
     if (this.bestiaryPage === 0) {
-      const cols = 2, bw = (cw - 60) / cols, bh = 160, gap = 12;
-      towerRegistry.getAllDefs().forEach((def, i) => {
+      const cols = 2, bw = (cw - 60) / cols, bh = 230, gap = 12;
+      const defs = towerRegistry.getAllDefs();
+      const rows = Math.ceil(defs.length / cols);
+      this.bestiaryContentH = rows * (bh + gap);
+      defs.forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
         const ec = ELEMENT_COLORS[def.element];
         ctx.fillStyle = '#0d0d20'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = ec + '66'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
@@ -265,18 +283,36 @@ export class OverlayRenderer {
         ctx.fillStyle = '#5566aa'; ctx.font = '10px Segoe UI';
         wrapTextLeft(ctx, def.description, bx + 12, by + 85, bw - 20, 14);
 
-        ctx.fillStyle = '#446666'; ctx.font = '9px Segoe UI';
-        const magicLabels: Record<string, string> = { fire: '✨ 3-alvo', water: '✨ -5%vel perm.', earth: '✨ AoE', wind: '✨ empurrão 3t' };
-        ctx.fillText(`✨ ${magicLabels[def.element]}`, bx + 12, by + bh - 14);
+        // ── Evolution paths ─────────────────
+        const evoDefs = evolutionRegistry.getByElement(def.element);
+        if (evoDefs.length > 0) {
+          const evoY = by + 125;
+          ctx.fillStyle = '#ffffff33';
+          ctx.fillRect(bx + 12, evoY, bw - 24, 1);
+          ctx.fillStyle = '#aaaacc'; ctx.font = 'bold 9px Segoe UI';
+          ctx.fillText('⚡ Evoluções (nível 10):', bx + 12, evoY + 14);
+
+          evoDefs.forEach((evo, ei) => {
+            const ey = evoY + 20 + ei * 28;
+            ctx.fillStyle = evo.color; ctx.font = 'bold 9px Segoe UI';
+            ctx.fillText(`${evo.icon} ${evo.name}`, bx + 16, ey + 10);
+            ctx.fillStyle = '#667788'; ctx.font = '8px Segoe UI';
+            ctx.fillText(evo.roleLabel, bx + 16 + ctx.measureText(`${evo.icon} ${evo.name}  `).width, ey + 10);
+            ctx.fillStyle = '#556677'; ctx.font = '7px Segoe UI';
+            ctx.fillText(`✅ ${evo.strengths}  ⚠ ${evo.weaknesses}`, bx + 16, ey + 22);
+          });
+        }
       });
     }
 
     else if (this.bestiaryPage === 1) {
       const allEnemies = [...enemyRegistry.getStandardDefs(), ...enemyRegistry.getBossDefs()];
       const cols = 2, bw = (cw - 60) / cols, bh = 130, gap = 10;
+      const rows = Math.ceil(allEnemies.length / cols);
+      this.bestiaryContentH = rows * (bh + gap);
       allEnemies.forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
         ctx.fillStyle = def.isBoss ? '#1a0a1a' : '#0d0d1e';
         roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = def.color + '55'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
@@ -301,9 +337,12 @@ export class OverlayRenderer {
 
     else {
       const bw = (cw - 60) / 2, bh = 150, gap = 12;
-      enemyRegistry.getGolemDefs().forEach((def, i) => {
+      const defs = enemyRegistry.getGolemDefs();
+      const rows = Math.ceil(defs.length / 2);
+      this.bestiaryContentH = rows * (bh + gap);
+      defs.forEach((def, i) => {
         const col = i % 2, row = Math.floor(i / 2);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
         const ec = ELEMENT_COLORS[def.golemType!];
         ctx.fillStyle = '#0e0e18'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = ec + '88'; ctx.lineWidth = 2; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
@@ -324,7 +363,7 @@ export class OverlayRenderer {
         ctx.fillStyle = '#6688aa'; ctx.font = '10px Segoe UI';
         wrapTextLeft(ctx, def.description, bx + 8, by + 75, bw - 16, 13);
         const abilities: Record<string, string> = {
-          fire: '🔥 Âncora ofensiva: aliados em 130px ficam 12% mais rápidos',
+          fire: '🔥 Âncora ofensiva: aliados em 130px ficam 12% mais rápidos e imunes a queimadura',
           water: '💧 Âncora de sustain: a cada 3.5s cura aliados em 110px (1.8% HP)',
           earth: '🌍 Âncora defensiva: aliados em 100px recebem 18% menos dano',
           wind: '💨 Âncora de ritmo: rajadas periódicas (+25% velocidade por 1.5s)',
@@ -332,6 +371,21 @@ export class OverlayRenderer {
         ctx.fillStyle = ec; ctx.font = 'bold 9px Segoe UI';
         ctx.fillText(abilities[def.golemType!] ?? '', bx + 8, by + bh - 12);
       });
+    }
+
+    // Restore clip
+    ctx.restore();
+
+    // ── Scrollbar ──────────────────────────────────────────────────────────
+    const viewH = ch - startY - 60;
+    if (this.bestiaryContentH > viewH) {
+      const trackX = cw - 14, trackY = startY + 4, trackH = viewH - 8;
+      const ratio = viewH / this.bestiaryContentH;
+      const thumbH = Math.max(24, trackH * ratio);
+      const maxScroll = this.bestiaryContentH - viewH;
+      const thumbY = trackY + (maxScroll > 0 ? (scrollY / maxScroll) * (trackH - thumbH) : 0);
+      ctx.fillStyle = '#1a1a2e'; ctx.fillRect(trackX, trackY, 8, trackH);
+      ctx.fillStyle = '#4444aa'; roundedRect(ctx, trackX, thumbY, 8, thumbH, 4); ctx.fill();
     }
 
     const backLabel = returnScreen === 'menu' ? '← Voltar ao Menu' : '← Voltar ao Jogo';

@@ -148,6 +148,19 @@ export class WaveManager {
 
   // ─── Wave Composition (shared by startWave + preview) ─────────────────────
 
+  /** Returns normalized weight array for N types: primary ~55%, secondary ~28%, rest split ~17% */
+  private getTypeWeights(count: number): number[] {
+    if (count <= 1) return [1.0];
+    if (count === 2) return [0.6, 0.4];
+    // Primary 55%, secondary 28%, remainder splits 17%
+    const primary = 0.55;
+    const secondary = 0.28;
+    const remainder = 1 - primary - secondary;
+    const restCount = count - 2;
+    const restEach = remainder / restCount;
+    return [primary, secondary, ...Array(restCount).fill(restEach)];
+  }
+
   private composeWavePool(wave: number): SpawnQueue[] {
     const isBoss = wave % this.rules.bossEveryN === 0;
     const rng = waveRng(wave * 1337 + 7);
@@ -183,11 +196,30 @@ export class WaveManager {
       chosen.push(poolCopy.splice(idx, 1)[0]);
     }
 
-    const totalCount = Math.round(cfg.enemy.waveBaseCount + wave * cfg.enemy.waveCountPerWave);
-    const perType = Math.max(1, Math.round(totalCount / chosen.length));
+    // ── Micro-variation: within a themed block, swap out one non-primary
+    // preferred type for a random pool type ~40% of the time.
+    // This prevents consecutive waves in the same hint block from being
+    // identical while preserving the first (primary) preferred type.
+    if (uniquePreferred.length >= 2 && poolCopy.length > 0 && chosen.length >= 2) {
+      if (rng() < 0.40) {
+        // Pick a swap candidate from positions 1+ (never swap the primary theme type)
+        const swapIdx = 1 + Math.floor(rng() * (chosen.length - 1));
+        const replacement = poolCopy[Math.floor(rng() * poolCopy.length)];
+        if (replacement !== chosen[0]) {
+          chosen[swapIdx] = replacement;
+        }
+      }
+    }
 
+    const totalCount = Math.round(cfg.enemy.waveBaseCount + wave * cfg.enemy.waveCountPerWave);
+
+    // Weighted distribution: primary type gets ~55%, secondary ~28%, rest ~17%
+    const weights = this.getTypeWeights(chosen.length);
     const queues: SpawnQueue[] = chosen.map((typeId, i) => ({
-      typeId, count: perType, timer: i === 0 ? 300 : 0, spawned: 0, isBoss: false, isElite: false,
+      typeId,
+      count: Math.max(1, Math.round(totalCount * weights[i])),
+      timer: i === 0 ? 300 : 0,
+      spawned: 0, isBoss: false, isElite: false,
     }));
 
     const elites = eliteCountForWave(wave);

@@ -4,7 +4,7 @@ export class CombatConfig {
   readonly minHitChance = 0.25;
 
   // Wind magic
-  readonly windPushCells = 3;  // tiles pushed back by wind magic
+  readonly windPushCells = 2;  // tiles pushed back by wind magic (was 3)
 
   // Earth magic
   readonly earthAoeRadius = 80;  // px radius for AoE explosion

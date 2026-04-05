@@ -14,6 +14,7 @@ export class EnemyBehaviorSystem {
       if (!e.dead) {
         e.tempDamageReduction = 0;
         e.tempSpeedBoost      = 1;
+        e.tempAgilityBoost    = 0;
         e.resistedElement     = null;
       }
     }

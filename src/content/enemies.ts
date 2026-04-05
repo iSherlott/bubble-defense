@@ -71,7 +71,7 @@ export const ENEMY_DEFS: EnemyDef[] = [
     baseHp: 105, speed: 88, agility: 6,
     immune: 'wind', halfElements: ['water', 'earth'],
     color: '#99dd44', size: 13, baseLivesLost: 1, reward: 25, xp: 8,
-    description: 'Suporte de ritmo. "Corrente Ascendente": aliados dentro de 100 px ganham 15 % de velocidade.',
+    description: 'Disruptor de precisão. "Interferência Tempestuosa": aliados dentro de 90 px ganham +50 % de evasão.',
     behaviorIds: ['upcurrent'],
   },
 
@@ -87,15 +87,15 @@ export const ENEMY_DEFS: EnemyDef[] = [
     behaviorIds: ['reactive_shadow'],
   },
 
-  // ── Dragão — Elite de pressão de área ────────────────────────────────────
-  // Mini-boss recurrente. Leaves a sustain trail that speeds nearby allies.
-  // "Rastro Elemental": every 2.8 s drops a trail zone (+18 % speed for allies inside).
+  // ── Dragão — Elite territorial ────────────────────────────────────────────
+  // Mini-boss recorrente. Leaves ash trail zones that grant evasion to allies.
+  // "Rastro de Cinzas": every 2.8 s drops a trail zone (+15 % agility for allies inside).
   {
     id: 'dragon', name: 'Dragão',
     baseHp: 510, speed: 58, agility: 7,
     immune: 'fire', halfElements: ['water', 'wind'],
     color: '#cc3300', size: 24, baseLivesLost: 3, reward: 52, xp: 20,
-    description: 'Elite de pressão. "Rastro Elemental": deixa zonas de sustain que aceleram aliados em +18 %.',
+    description: 'Elite territorial. "Rastro de Cinzas": deixa zonas que concedem +15 % evasão a aliados dentro delas.',
     behaviorIds: ['elemental_trail'],
   },
 ];
@@ -106,13 +106,13 @@ export const ENEMY_DEFS: EnemyDef[] = [
 
 export const GOLEM_DEFS: EnemyDef[] = [
   // ── Golem de Fogo — Anchor ofensivo ───────────────────────────────────────
-  // Ember aura pushes nearby allies 12 % faster.
+  // Fire fury: allies within 130 px gain +12 % speed and are immune to burn.
   {
     id: 'golem_fire', name: 'Golem de Fogo',
     baseHp: 310, speed: 35, agility: 2,
     immune: 'water', halfElements: ['wind', 'earth'],
     color: '#cc4400', size: 20, baseLivesLost: 2, reward: 36, xp: 12,
-    description: 'Âncora ofensiva. Imune a fogo/queimadura. Aura de brasa: aliados em 130 px ficam 12 % mais rápidos.',
+    description: 'Âncora ofensiva. "Fúria Ígnea": aliados em 130 px ficam 12 % mais rápidos e imunes a queimadura.',
     golemType: 'fire',
     behaviorIds: ['fire_anchor'],
   },
@@ -160,13 +160,13 @@ export const GOLEM_DEFS: EnemyDef[] = [
 
 export const DISABLER_DEFS: EnemyDef[] = [
   // Anulador de Fogo — quebra composições centradas em fogo
-  // Secondary: +10 % speed to nearby allies
+  // Secondary: +12 % speed to nearby allies (aggressive pressure)
   {
     id: 'disabler_fire', name: 'Anulador de Fogo',
     baseHp: 260, speed: 55, agility: 5,
     immune: 'fire', halfElements: ['wind', 'earth'],
     color: '#ff4400', size: 16, baseLivesLost: 1, reward: 28, xp: 10,
-    description: 'Desativa torres de Fogo próximas. Bônus: aliados próximos ficam 10 % mais rápidos.',
+    description: 'Desativa torres de Fogo próximas. Bônus: aliados próximos ficam 12 % mais rápidos.',
     behaviorIds: ['disabler_aura'],
     disablerElement: 'fire',
     renderProfileId: 'disabler',
@@ -186,26 +186,26 @@ export const DISABLER_DEFS: EnemyDef[] = [
   },
 
   // Anulador de Terra — quebra composições de sustain/consistência
-  // Secondary: 12 % damage shield to nearby allies
+  // Secondary: 15 % damage shield to nearby allies (defensive stabilisation)
   {
     id: 'disabler_earth', name: 'Anulador de Terra',
     baseHp: 260, speed: 55, agility: 5,
     immune: 'earth', halfElements: ['fire', 'water'],
     color: '#88aa22', size: 16, baseLivesLost: 1, reward: 28, xp: 10,
-    description: 'Desativa torres de Terra próximas. Bônus: aliados próximos recebem 12 % menos dano.',
+    description: 'Desativa torres de Terra próximas. Bônus: aliados próximos recebem 15 % menos dano.',
     behaviorIds: ['disabler_aura'],
     disablerElement: 'earth',
     renderProfileId: 'disabler',
   },
 
   // Anulador de Vento — quebra builds de reposicionamento
-  // Secondary: +10 % speed to nearby allies
+  // Secondary: strips stun (anti-CC)
   {
     id: 'disabler_wind', name: 'Anulador de Vento',
     baseHp: 260, speed: 55, agility: 5,
     immune: 'wind', halfElements: ['fire', 'water'],
     color: '#aacc44', size: 16, baseLivesLost: 1, reward: 28, xp: 10,
-    description: 'Desativa torres de Vento próximas. Bônus: aliados próximos ficam 10 % mais rápidos.',
+    description: 'Desativa torres de Vento próximas. Bônus: remove atordoamento de aliados próximos (anti-CC).',
     behaviorIds: ['disabler_aura'],
     disablerElement: 'wind',
     renderProfileId: 'disabler',

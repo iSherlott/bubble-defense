@@ -8,8 +8,9 @@ import { TOWER_DEFS } from './towers';
 import { ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS, DISABLER_DEFS } from './enemies';
 import { FUSION_DEFS } from './fusions';
 import { ITEM_DEFS } from './items';
+import { EVOLUTION_DEFS } from './evolutions';
 import {
-  towerRegistry, enemyRegistry, fusionRegistry, itemRegistry,
+  towerRegistry, enemyRegistry, fusionRegistry, itemRegistry, evolutionRegistry,
 } from '../registries';
 
 // ── Magic Behaviors ──
@@ -17,6 +18,14 @@ import {
   FireMagicBehavior, WaterMagicBehavior,
   EarthMagicBehavior, WindMagicBehavior,
 } from '../behaviors/MagicBehaviors';
+
+// ── Evolution Magic Behaviors ──
+import {
+  IncineratorMagicBehavior, FlamethrowerMagicBehavior, FurnaceMagicBehavior,
+  CryomancerMagicBehavior, PressureTideMagicBehavior, AbyssalWellMagicBehavior,
+  BallistaMagicBehavior, QuarryMagicBehavior, MonolithMagicBehavior,
+  HarpoonMagicBehavior, BladeStormMagicBehavior, TacticalCycloneMagicBehavior,
+} from '../behaviors/EvolutionMagicBehaviors';
 
 // ── Fusion Behaviors ──
 import {
@@ -82,6 +91,20 @@ registerMagicBehavior('fire',  new FireMagicBehavior());
 registerMagicBehavior('water', new WaterMagicBehavior());
 registerMagicBehavior('earth', new EarthMagicBehavior());
 registerMagicBehavior('wind',  new WindMagicBehavior());
+
+// ── Evolution magic behaviors ──
+registerMagicBehavior('evo_fire_incinerator',    new IncineratorMagicBehavior());
+registerMagicBehavior('evo_fire_flamethrower',   new FlamethrowerMagicBehavior());
+registerMagicBehavior('evo_fire_furnace',        new FurnaceMagicBehavior());
+registerMagicBehavior('evo_water_cryomancer',    new CryomancerMagicBehavior());
+registerMagicBehavior('evo_water_pressure_tide', new PressureTideMagicBehavior());
+registerMagicBehavior('evo_water_abyssal_well',  new AbyssalWellMagicBehavior());
+registerMagicBehavior('evo_earth_ballista',      new BallistaMagicBehavior());
+registerMagicBehavior('evo_earth_quarry',        new QuarryMagicBehavior());
+registerMagicBehavior('evo_earth_monolith',      new MonolithMagicBehavior());
+registerMagicBehavior('evo_wind_harpoon',        new HarpoonMagicBehavior());
+registerMagicBehavior('evo_wind_blade_storm',    new BladeStormMagicBehavior());
+registerMagicBehavior('evo_wind_tactical_cyclone', new TacticalCycloneMagicBehavior());
 
 // ─── Fusion behavior map ───────────────────────────────────────────────────────
 const fusionBehaviors: Record<string, FusionBehavior> = {
@@ -222,6 +245,11 @@ export function registerAllContent(): void {
   for (const def of ITEM_DEFS) {
     const effect = itemEffects[def.id] ?? { id: def.id };
     itemRegistry.register(def, effect);
+  }
+
+  // ── Evolutions ─────────────────────────────────────────────────────────────
+  for (const def of EVOLUTION_DEFS) {
+    evolutionRegistry.register(def);
   }
 
   // ── Enemy Render Profiles ──────────────────────────────────────────────────

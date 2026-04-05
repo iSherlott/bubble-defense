@@ -35,8 +35,14 @@ export abstract class BaseEnemy extends BaseEntity {
   tempDamageReduction = 0;
   /** Speed multiplier bonus (1 = none, 1.2 = 20% faster). Stacks via Math.max. */
   tempSpeedBoost = 1;
+  /** Agility multiplier bonus (0 = none, 0.5 = 50% more evasion). Stacks via Math.max. */
+  tempAgilityBoost = 0;
   /** Element this enemy currently resists by ~35% (set by reactive behaviors). */
   resistedElement: ElementType | null = null;
+
+  // ── Wind push resistance (diminishing returns) ────────────────────────────
+  /** Accumulated push resistance (0–1). Each push adds resistance; decays over time. */
+  pushResistance = 0;
 
   // ── Persistent runtime tracking ───────────────────────────────────────────
   /** Seconds elapsed since last damage received — used by ThickHide regen. */
@@ -115,12 +121,31 @@ export abstract class BaseEnemy extends BaseEntity {
     this.permanentSlowStacks = Math.min(max, this.permanentSlowStacks + 1);
   }
 
+  /**
+   * Apply wind push with diminishing returns.
+   * Each push: effective = rawPx × (1 − pushResistance).
+   * After each push, resistance grows by 0.25 (capped at 0.85).
+   * Resistance decays in tickPushResistance().
+   */
+  applyPush(rawPx: number): number {
+    const effective = rawPx * (1 - this.pushResistance);
+    this.distanceTraveled = Math.max(0, this.distanceTraveled - effective);
+    // Grow resistance per push event (cap at 85% — never fully immune)
+    this.pushResistance = Math.min(0.85, this.pushResistance + 0.25);
+    return effective;
+  }
+
   // ─── Update loop — movement + effects ────────────────────────────────────
   update(dt: number, waypoints: Vec2[], totalLength: number) {
     if (this.dead || this.reachedEnd) return;
 
     // Tick the "time since last damage" counter (used by ThickHide regen)
     this.lastDamageTimer += dt;
+
+    // Decay push resistance over time (~2.5s to fully recover from one push)
+    if (this.pushResistance > 0) {
+      this.pushResistance = Math.max(0, this.pushResistance - 0.10 * dt);
+    }
 
     if (this.stunRemaining > 0) {
       this.stunRemaining = Math.max(0, this.stunRemaining - dt);

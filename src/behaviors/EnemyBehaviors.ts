@@ -144,18 +144,19 @@ export class TidalRiteBehavior implements EnemyBehavior {
 }
 
 // ─── Upcurrent (Storm Ranger) ─────────────────────────────────────────────────
-// The storm ranger's slipstream accelerates nearby allies.
+// The storm ranger creates an interference field that boosts nearby allies' evasion.
+// "Interferência Tempestuosa": allies within 90 px gain +50% agility (dodge support).
 
 export class UpcurrentBehavior implements EnemyBehavior {
   id = 'upcurrent';
-  private static RADIUS_SQ = 100 * 100;
-  private static SPEED_BONUS = 1.15;
+  private static RADIUS_SQ = 90 * 90;
+  private static AGILITY_BONUS = 0.50;
 
   onUpdate(ctx: IGameContext, enemy: BaseEnemy, _dt: number): void {
     for (const ally of ctx.enemies) {
       if (ally === enemy || ally.dead) continue;
       if (distSq(ally.pos.x, ally.pos.y, enemy.pos.x, enemy.pos.y) < UpcurrentBehavior.RADIUS_SQ) {
-        ally.tempSpeedBoost = Math.max(ally.tempSpeedBoost, UpcurrentBehavior.SPEED_BONUS);
+        ally.tempAgilityBoost = Math.max(ally.tempAgilityBoost, UpcurrentBehavior.AGILITY_BONUS);
       }
     }
   }
@@ -185,13 +186,16 @@ export class ReactiveShadowBehavior implements EnemyBehavior {
 }
 
 // ─── Elemental Trail (Dragon) ─────────────────────────────────────────────────
-// The dragon leaves sustain zones that speed nearby allies.
+// The dragon leaves territorial ash zones along its path.
+// "Rastro de Cinzas": allies inside ash zones gain +15% agility (evasion).
+// Creates "evasion corridors" — a territorial hazard that makes enemies harder to hit.
 
 export class ElementalTrailBehavior implements EnemyBehavior {
   id = 'elemental_trail';
   private static INTERVAL = 2.8;
-  private static TRAIL_DURATION = 4.5;
+  private static TRAIL_DURATION = 5.0;
   private static TRAIL_RADIUS = 42;
+  private static AGILITY_BONUS = 0.15;
 
   /** Per-dragon: list of active trail points */
   private trails = new Map<number, Array<{ x: number; y: number; remaining: number }>>();
@@ -209,7 +213,7 @@ export class ElementalTrailBehavior implements EnemyBehavior {
     }
     this.trailTimers.set(enemy.id, timer);
 
-    // Tick and apply trail effects
+    // Tick and apply trail effects — allies in ash zones gain agility
     const list = this.trails.get(enemy.id);
     if (!list) return;
     const rSq = ElementalTrailBehavior.TRAIL_RADIUS * ElementalTrailBehavior.TRAIL_RADIUS;
@@ -217,11 +221,10 @@ export class ElementalTrailBehavior implements EnemyBehavior {
       const pt = list[i];
       pt.remaining -= dt;
       if (pt.remaining <= 0) { list.splice(i, 1); continue; }
-      // Allies within trail zone get a moderate speed boost
       for (const ally of ctx.enemies) {
         if (ally.dead) continue;
         if (distSq(ally.pos.x, ally.pos.y, pt.x, pt.y) < rSq) {
-          ally.tempSpeedBoost = Math.max(ally.tempSpeedBoost, 1.18);
+          ally.tempAgilityBoost = Math.max(ally.tempAgilityBoost, ElementalTrailBehavior.AGILITY_BONUS);
         }
       }
     }
@@ -233,7 +236,9 @@ export class ElementalTrailBehavior implements EnemyBehavior {
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── Fire Anchor (Golem de Fogo) ─────────────────────────────────────────────
-// Generates an ember aura that pushes nearby allies slightly faster.
+// Offensive fire anchor: allies within 130 px are driven into a fiery rush
+// (+12% speed) and are immune to burn.
+// "Fúria Ígnea": constant speed pressure + burn cleanse.
 
 export class FireAnchorBehavior implements EnemyBehavior {
   id = 'fire_anchor';
@@ -244,7 +249,10 @@ export class FireAnchorBehavior implements EnemyBehavior {
     for (const ally of ctx.enemies) {
       if (ally === enemy || ally.dead) continue;
       if (distSq(ally.pos.x, ally.pos.y, enemy.pos.x, enemy.pos.y) < FireAnchorBehavior.RADIUS_SQ) {
+        // Fire fury — constant speed push
         ally.tempSpeedBoost = Math.max(ally.tempSpeedBoost, FireAnchorBehavior.SPEED_BONUS);
+        // Strip burn effects
+        ally.effects = ally.effects.filter(e => e.type !== 'burn');
       }
     }
   }
@@ -419,20 +427,20 @@ export class DisablerAuraBehavior implements EnemyBehavior {
 
       switch (element) {
         case 'fire':
-          // Anulador de Fogo: push allies forward faster
-          ally.tempSpeedBoost = Math.max(ally.tempSpeedBoost, 1.10);
+          // Anulador de Fogo: offensive pressure — allies gain +12% speed
+          ally.tempSpeedBoost = Math.max(ally.tempSpeedBoost, 1.12);
           break;
         case 'water':
           // Anulador de Água: strip slow effects (debuff cleanse)
           ally.effects = ally.effects.filter(e => e.type !== 'slow');
           break;
         case 'earth':
-          // Anulador de Terra: light damage shield
-          ally.tempDamageReduction = Math.max(ally.tempDamageReduction, 0.12);
+          // Anulador de Terra: defensive stabilisation — 15% damage shield
+          ally.tempDamageReduction = Math.max(ally.tempDamageReduction, 0.15);
           break;
         case 'wind':
-          // Anulador de Vento: mobility and push resistance
-          ally.tempSpeedBoost = Math.max(ally.tempSpeedBoost, 1.10);
+          // Anulador de Vento: strip stun and grant push immunity (anti-CC)
+          ally.stunRemaining = 0;
           break;
       }
     }

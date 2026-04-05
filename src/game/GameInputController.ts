@@ -13,6 +13,7 @@ export class GameInputController {
     g.canvas.addEventListener('mousemove', e => this.onMouseMove(e));
     g.canvas.addEventListener('click',     e => this.onClick(e));
     g.canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.onRightClick(e); });
+    g.canvas.addEventListener('wheel', e => this.onWheel(e), { passive: false });
     window.addEventListener('keydown', e => this.onKeyDown(e));
   }
 
@@ -40,6 +41,13 @@ export class GameInputController {
     const g = this.game;
     g.mousePos = this.cvPos(e);
     if (g.screen === 'game') g.hoveredCell = this.px2grid(g.mousePos);
+  }
+
+  private onWheel(e: WheelEvent) {
+    if (this.game.screen === 'bestiary') {
+      e.preventDefault();
+      this.game.renderer.handleBestiaryWheel(e.deltaY);
+    }
   }
 
   private onClick(e: MouseEvent) {
@@ -273,6 +281,19 @@ export class GameInputController {
       const k = `addSecond_${def.id}`;
       if (btns[k] && this.hit(p, btns[k])) {
         g.towerService.placeTower(g, def.id, popup.col, popup.row, 1);
+        g.upgradePopup = null; return;
+      }
+    }
+
+    // Evolution buttons
+    for (const key of Object.keys(btns)) {
+      if (key.startsWith('evo_') && this.hit(p, btns[key])) {
+        const evoId = key.slice(4); // strip "evo_" prefix
+        const here = g.towerService.towersAt(g.towers, popup.col, popup.row);
+        const evoTower = here.find(t => t.needsEvolution);
+        if (evoTower) {
+          g.towerService.evolveTower(g, evoTower, evoId);
+        }
         g.upgradePopup = null; return;
       }
     }
