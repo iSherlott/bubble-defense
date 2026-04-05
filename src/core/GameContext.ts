@@ -52,8 +52,14 @@ export interface IGameContext {
   // Item drop animation
   itemDropAnim: ItemDropAnim | null;
 
-  // Screen transition
+  // Screen
   screen: string;
+
+  /**
+   * Request a screen transition through the state machine (respects guards).
+   * Prefer this over direct `ctx.screen = ...` assignments.
+   */
+  requestScreen(to: import('../types').GameScreen): void;
 
   // Actions
   addFT(pos: Vec2, text: string, color: string): void;

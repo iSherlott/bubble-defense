@@ -63,7 +63,7 @@ export class RewardSystem {
           ctx.addFT(e.pos, `-${lost}❤`, '#ff4444');
         }
         if (ctx.lives <= 0) {
-          ctx.screen = 'gameover';
+          ctx.requestScreen('gameover');
           return true; // game over
         }
       }
@@ -85,7 +85,7 @@ export class RewardSystem {
         ctx.addFT(e.pos, `+${g}g`, '#ffdd44');
       }
       const xpMult = 1 + (ctx.waveManager.currentWave - 1) * GameConfig.get().economy.xpScalePerWave;
-      if (ctx.player.addXp(Math.round(e.def.xp * xpMult))) ctx.screen = 'levelup';
+      if (ctx.player.addXp(Math.round(e.def.xp * xpMult))) ctx.requestScreen('levelup');
     }
   }
 }

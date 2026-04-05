@@ -4,10 +4,10 @@
 //  fusionRegistry, and itemRegistry.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import {
-  TOWER_DEFS, ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS,
-  FUSION_DEFS, ITEM_DEFS,
-} from '../constants';
+import { TOWER_DEFS } from './towers';
+import { ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS } from './enemies';
+import { FUSION_DEFS } from './fusions';
+import { ITEM_DEFS } from './items';
 import {
   towerRegistry, enemyRegistry, fusionRegistry, itemRegistry,
 } from '../registries';

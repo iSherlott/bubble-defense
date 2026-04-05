@@ -1,11 +1,9 @@
 import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim } from '../types';
 import { CELL_SIZE,
   BASE_LIVES, INITIAL_GOLD,
-  UPGRADE_MULT_STEP, DUAL_MAGIC_BASE_CHANCE, DUAL_MAGIC_LUCK_BONUS,
   MAP_TIER_AT, MAP_EXPAND_COST } from '../constants';
 import { GameConfig } from '../config';
-import { Tower, createTower, resetTowerIds, FusionTower } from '../entities/Tower';
-import type { BaseTower } from '../entities/BaseTower';
+import { Tower, createTower, resetTowerIds } from '../entities/Tower';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import { resetProjectileIds } from '../entities/Projectile';
 import { Player } from '../player/Player';
@@ -23,6 +21,8 @@ import { CombatSystem } from '../systems/CombatSystem';
 import { EffectSystem } from '../systems/EffectSystem';
 import { BossSystem } from '../systems/BossSystem';
 import { RewardSystem } from '../systems/RewardSystem';
+import { TowerPlacementService, PlacementContext } from '../services/TowerPlacementService';
+import { StateStore } from '../state/StateStore';
 import { registerAllContent } from '../content/registerAll';
 
 export interface UpgradePopup { col: number; row: number; }
@@ -78,6 +78,10 @@ export class Game implements IGameContext {
   readonly effectSystem: EffectSystem;
   readonly bossSystem: BossSystem;
   readonly rewardSystem: RewardSystem;
+  readonly placement: TowerPlacementService;
+
+  /** Central state store — exposes typed slice managers and the screen FSM. */
+  readonly store!: StateStore;
 
   private lastTime = 0;
   private currentMapSeed = 1;
@@ -96,11 +100,18 @@ export class Game implements IGameContext {
     this.effectSystem = new EffectSystem();
     this.bossSystem = new BossSystem();
     this.rewardSystem = new RewardSystem(this.itemSystem);
+    this.placement = new TowerPlacementService(this.itemSystem);
 
     // Default map so renderer never crashes before game start
     this.map = generateMap(1, 0);
     this.renderer = new Renderer(canvas, this.ctx, this.map);
     this.modal = new Modal();
+
+    // State store — wired after player/talentTree/waveManager exist
+    (this as { store: StateStore }).store = new StateStore(this.map);
+    this.store.wire(this.player, this.talentTree, this.waveManager, hasSave);
+    this.store.setAoeFlashHandler((x, y, r) => this.renderer.triggerAoe(x, y, r));
+
     this.setupInput();
   }
 
@@ -304,15 +315,9 @@ export class Game implements IGameContext {
       for (const def of towerRegistry.getAllDefs()) {
         const k = `addSecond_${def.id}`;
         if (btns[k] && this.hit(p, btns[k])) {
-          const cost = this.towerCost(def.id) * 2;
-          if (this.gold >= cost) {
-            this.gold -= cost;
-            const t = createTower(def, this.upgradePopup.col, this.upgradePopup.row, 1);
-            t.placedCost = cost;
-            t.goldSpent  = cost;
-            t.isSecondary = true;
-            this.towers.push(t);
-          }
+          const ctx = this.placementCtx;
+          this.placement.placeSecond(ctx, this.upgradePopup.col, this.upgradePopup.row, def.id);
+          this.syncFromCtx(ctx);
           this.upgradePopup = null; return;
         }
       }
@@ -370,7 +375,7 @@ export class Game implements IGameContext {
       if (here.length > 0) {
         this.upgradePopup = { col: cell.x, row: cell.y };
       } else if (this.selectedTowerType) {
-        this.placeTower(cell.x, cell.y, 0);
+        this.placeTower(cell.x, cell.y);
         this.selectedTowerType = '';   // deselect after placing
       }
     }
@@ -388,87 +393,59 @@ export class Game implements IGameContext {
     if (here.length > 0) this.modal.showTower(here[0], this.player.stats, this.talentTree);
   }
 
+  // ─── Placement context getter ─────────────────────────────────────────────────
+  private get placementCtx() {
+    return {
+      towers: this.towers,
+      gold: this.gold,
+      map: this.map,
+      player: this.player,
+      items: this.items,
+      selectedTowerType: this.selectedTowerType,
+      addFT: this.addFT.bind(this),
+    };
+  }
+
+  // Sync ctx changes back (gold/towers can be replaced by service)
+  private syncFromCtx(ctx: PlacementContext) {
+    this.towers = ctx.towers;
+    this.gold   = ctx.gold;
+  }
+
   // ─── Tower helpers ───────────────────────────────────────────────────────────
   towersAt(col: number, row: number): Tower[] {
-    return this.towers.filter(t => t.gridX === col && t.gridY === row);
+    return this.placement.towersAt(this.placementCtx, col, row);
   }
 
-  /** Cost = baseCost × (count of that type already placed + 1), minus item discount */
   towerCost(typeId: string): number {
-    const count = this.towers.filter(t => t.def.id === typeId).length;
-    const def = towerRegistry.getDef(typeId);
-    const base = def.baseCost * (count + 1);
-    return Math.max(1, Math.round(base * (1 - this.itemSystem.getDiscount(this.items))));
+    return this.placement.towerCost(this.placementCtx, typeId);
   }
 
-  /** Per-tower upgrade cost: baseCost × (1 + upgradeCount × 0.3), minus item discount */
   towerUpgradeCost(tower?: Tower): number {
-    if (!tower) return 50; // fallback
-    const base = Math.round(tower.def.baseCost * (1 + tower.upgradeCount * 0.2));
-    return Math.max(1, Math.round(base * (1 - this.itemSystem.getDiscount(this.items))));
+    return this.placement.towerUpgradeCost(this.placementCtx, tower);
   }
 
-  private placeTower(col: number, row: number, slot: 0 | 1) {
-    const { cols, rows, pathCells } = this.map;
-    if (col < 0 || col >= cols || row < 0 || row >= rows) return;
-    if (pathCells.has(`${col},${row}`)) return;
-    if (!this.selectedTowerType) return;
-    if (!towerRegistry.has(this.selectedTowerType)) return;
-    const def = towerRegistry.getDef(this.selectedTowerType);
-    const cost = this.towerCost(def.id);
-    if (this.gold < cost) return;
-    this.gold -= cost;
-    const t = createTower(def, col, row, slot);
-    t.placedCost = cost;
-    t.goldSpent  = cost;
-    this.towers.push(t);
+  private placeTower(col: number, row: number) {
+    const ctx = this.placementCtx;
+    this.placement.place(ctx, col, row);
+    this.syncFromCtx(ctx);
   }
 
   private sellTower(tower: Tower) {
-    const refund = Math.floor(tower.goldSpent / 2);
-    this.gold += refund;
-    this.addFT({ x: tower.pixelX, y: tower.pixelY }, `+${refund}g 🏷`, '#ffdd44');
-    this.towers = this.towers.filter(t => t.id !== tower.id);
+    const ctx = this.placementCtx;
+    this.placement.sell(ctx, tower);
+    this.syncFromCtx(ctx);
   }
 
   private doMoveTower(tower: Tower, col: number, row: number) {
-    const { cols, rows, pathCells } = this.map;
-    if (col < 0 || col >= cols || row < 0 || row >= rows) return;
-    if (pathCells.has(`${col},${row}`)) return;
-    const sameCell = col === tower.gridX && row === tower.gridY;
-    if (sameCell) return;
-
-    // Collect all towers on the source cell (primary + secondary)
-    const cellTowers = this.towersAt(tower.gridX, tower.gridY);
-    const destTowers = this.towersAt(col, row);
-
-    // Cannot move if destination already has towers
-    if (destTowers.length > 0) {
-      this.addFT({ x: tower.pixelX, y: tower.pixelY }, 'Célula ocupada', '#ff6666');
-      return;
-    }
-
-    // Total move cost: sum of each tower's move cost
-    let totalMoveCost = 0;
-    for (const t of cellTowers) {
-      totalMoveCost += Math.round(t.placedCost * GameConfig.get().movement.moveCostMult);
-    }
-    if (this.gold < totalMoveCost) {
-      this.addFT({ x: tower.pixelX, y: tower.pixelY }, `Sem ouro (${totalMoveCost}g)`, '#ff6666');
-      return;
-    }
-    this.gold -= totalMoveCost;
-
-    // Move all towers in-place, preserving id, cooldown, magicBar, etc.
-    for (const t of cellTowers) {
-      t.moveTo(col, row, t.slotIndex);
-    }
-    this.addFT({ x: cellTowers[0].pixelX, y: cellTowers[0].pixelY }, `Movido (-${totalMoveCost}g)`, '#aaccff');
+    const ctx = this.placementCtx;
+    this.placement.move(ctx, tower, col, row);
+    this.syncFromCtx(ctx);
   }
 
   expandMap() {
     const nextTier = this.currentMapTier + 1;
-    if (nextTier >= 4) return;  // already max tier
+    if (nextTier >= 4) return;
     const cost = Math.round(MAP_EXPAND_COST * (1 - this.itemSystem.getDiscount(this.items)));
     if (this.gold < cost) return;
     this.gold -= cost;
@@ -483,78 +460,24 @@ export class Game implements IGameContext {
     this.renderer.updateMap(this.map);
     this.addFT(
       { x: this.map.gameWidth / 2, y: this.map.gameHeight / 2 },
-      `🗺 Mapa expandido! Tier ${tier + 1}`, '#aaffaa'
+      `🗺 Mapa expandido! Tier ${tier + 1}`, '#aaffaa',
     );
   }
 
   private upgradeTower(tower: Tower) {
-    if (tower.isMaxLevel) return;
-    const stat: 'damage'|'speed' = Math.random() < 0.5 ? 'damage' : 'speed';
-    if (stat === 'damage') tower.damageMult += UPGRADE_MULT_STEP;
-    else                   tower.speedMult  += UPGRADE_MULT_STEP;
-    tower.upgradeCount++;
-    tower.upgradeHistory.push(stat);
-
-    const statLabel = stat === 'damage' ? '⚔ Dano' : '⚡ Vel';
-    const lvlMsg = tower.isMaxLevel ? `★ Nível MÁX!` : `Nível ${tower.level}`;
-    this.addFT({ x: tower.pixelX, y: tower.pixelY - 24 }, `${lvlMsg} +${statLabel}`, stat === 'damage' ? '#ff8888' : '#88ccff');
-
-    if (!tower.dualMagic) {
-      const chance = DUAL_MAGIC_BASE_CHANCE + this.player.stats.luck * DUAL_MAGIC_LUCK_BONUS;
-      if (Math.random() < chance) {
-        tower.dualMagic = true;
-        this.addFT({ x: tower.pixelX, y: tower.pixelY - 30 }, '✨ DUAL MAGIA!', '#ffff44');
-      }
-    }
+    const ctx = this.placementCtx;
+    this.placement.upgrade(ctx, tower);
   }
 
   // ─── Fusion System ──────────────────────────────────────────────────────────
-  /** Check if a cell with 2 max-level towers can fuse */
   canFuse(col: number, row: number): boolean {
-    const here = this.towersAt(col, row);
-    if (here.length !== 2) return false;
-    const primary = here.find(t => !t.isSecondary);
-    const secondary = here.find(t => t.isSecondary);
-    if (!primary || !secondary) return false;
-    if (!primary.isMaxLevel || !secondary.isMaxLevel) return false;
-    if (primary.fusionDef) return false; // already fused
-    return fusionRegistry.has(primary.def.element, secondary.def.element);
+    return this.placement.canFuse(this.placementCtx, col, row);
   }
 
-  /** Perform fusion on a cell */
   fuseTowers(col: number, row: number) {
-    if (!this.canFuse(col, row)) return;
-    const here = this.towersAt(col, row);
-    const primary = here.find(t => !t.isSecondary)!;
-    const secondary = here.find(t => t.isSecondary)!;
-    const fusion = fusionRegistry.getDef(primary.def.element, secondary.def.element);
-    if (!fusion) return;
-
-    // Create a real FusionTower and transfer primary's upgrade state
-    const ft = new FusionTower(primary.def, primary.gridX, primary.gridY, fusion);
-    ft.damageMult     = primary.damageMult;
-    ft.speedMult      = primary.speedMult;
-    ft.upgradeCount   = primary.upgradeCount;
-    ft.upgradeHistory = [...primary.upgradeHistory];
-    ft.dualMagic      = primary.dualMagic;
-    ft.placedCost     = primary.placedCost;
-    ft.goldSpent      = primary.goldSpent + secondary.goldSpent;
-    ft.totalDamageDealt = primary.totalDamageDealt + secondary.totalDamageDealt;
-    ft.totalKills     = primary.totalKills + secondary.totalKills;
-    ft.isSecondary    = false;
-
-    // Replace both towers with the fused one
-    this.towers = this.towers.filter(t => t.id !== primary.id && t.id !== secondary.id);
-    this.towers.push(ft);
-
-    this.addFT(
-      { x: ft.pixelX, y: ft.pixelY - 30 },
-      `${fusion.icon} FUSÃO: ${fusion.name}!`, fusion.color
-    );
-    this.addFT(
-      { x: ft.pixelX, y: ft.pixelY - 50 },
-      fusion.description, '#ddddff'
-    );
+    const ctx = this.placementCtx;
+    this.placement.fuse(ctx, col, row);
+    this.syncFromCtx(ctx);
   }
 
 
@@ -629,6 +552,14 @@ export class Game implements IGameContext {
       tower.isSecondary   = t.isSecondary ?? (t.slotIndex === 1);
       this.towers.push(tower);
     }
+    // Normalize cell slots after loading (guards against stale save state)
+    const loadedCtx = this.placementCtx;
+    const loadedCells = new Set(this.towers.map(t => `${t.gridX},${t.gridY}`));
+    for (const key of loadedCells) {
+      const [c, r] = key.split(',').map(Number);
+      this.placement.normalizeCell(loadedCtx, c, r);
+    }
+    this.syncFromCtx(loadedCtx);
 
     // Restore items
     if (data.game.items) {
@@ -743,6 +674,10 @@ export class Game implements IGameContext {
 
   triggerAoeFlash(x: number, y: number, radius: number) {
     this.renderer.triggerAoe(x, y, radius);
+  }
+
+  requestScreen(to: import('../types').GameScreen): void {
+    this.screen = to;
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
