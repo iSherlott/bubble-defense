@@ -1,29 +1,42 @@
 import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim } from '../types';
+<<<<<<< HEAD
 import { CELL_SIZE,
   BASE_LIVES, INITIAL_GOLD,
   MAP_TIER_AT, MAP_EXPAND_COST } from '../constants';
 import { GameConfig } from '../config';
 import { Tower, createTower, resetTowerIds } from '../entities/Tower';
+=======
+import { CELL_SIZE, BASE_LIVES, INITIAL_GOLD, MAP_TIER_AT } from '../constants';
+import { GameConfig } from '../config';
+import { Tower } from '../entities/Tower';
+>>>>>>> 1c469a1146d67af2f97adc4a135ac76ed0d4bc07
 import type { BaseEnemy } from '../entities/BaseEnemy';
-import { resetProjectileIds } from '../entities/Projectile';
 import { Player } from '../player/Player';
 import { SkillTree as TalentTree } from '../player/SkillTree';
 import { WaveManager } from './WaveManager';
-import { generateMap, extendMap } from './MapGenerator';
+import { generateMap } from './MapGenerator';
 import type { MapData } from './MapGenerator';
-import { saveGame, loadGame, hasSave } from './SaveSystem';
 import { Renderer } from '../ui/Renderer';
 import { Modal } from '../ui/Modal';
 import type { IGameContext, FloatingText, BurnZone } from '../core/GameContext';
-import { towerRegistry, fusionRegistry } from '../registries';
 import { ItemSystem } from '../systems/ItemSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { EffectSystem } from '../systems/EffectSystem';
 import { BossSystem } from '../systems/BossSystem';
 import { RewardSystem } from '../systems/RewardSystem';
+<<<<<<< HEAD
 import { TowerPlacementService, PlacementContext } from '../services/TowerPlacementService';
 import { StateStore } from '../state/StateStore';
+=======
+import { AnimationSystem } from '../systems/AnimationSystem';
+>>>>>>> 1c469a1146d67af2f97adc4a135ac76ed0d4bc07
 import { registerAllContent } from '../content/registerAll';
+
+// ── Extracted Services ────────────────────────────────────────────────────────
+import { TowerPlacementService } from './TowerPlacementService';
+import { TowerInteractionService } from './TowerInteractionService';
+import { GameInputController } from './GameInputController';
+import { GameFlowController } from './GameFlowController';
 
 export interface UpgradePopup { col: number; row: number; }
 
@@ -33,10 +46,10 @@ export class Game implements IGameContext {
 
   screen: GameScreen = 'menu';
   paused = false;
-  autoWave = false;   // automatically start next wave
+  autoWave = false;
   gameSpeed: 1 | 2 = 1;
   debugMode = false;
-  pendingAffinity: ElementType = 'fire';  // stored between affinity→archetype screens
+  pendingAffinity: ElementType = 'fire';
 
   gold   = INITIAL_GOLD;
   lives  = BASE_LIVES;
@@ -57,55 +70,82 @@ export class Game implements IGameContext {
   renderer: Renderer;
   modal: Modal;
 
-  selectedTowerType = '';      // '' = nothing selected
+  selectedTowerType = '';
   hoveredCell: Vec2 | null = null;
   mousePos: Vec2 = { x: 0, y: 0 };
   upgradePopup: UpgradePopup | null = null;
   movingTower: Tower | null = null;
 
-  // Item system state (public for IGameContext)
+  // Item system state
   items: OwnedItem[] = [];
   itemDropAnim: ItemDropAnim | null = null;
-  lastItemWave = 0;
-  cataclysmTimer = 0;
-  titanShieldCharges = 0;
-  titanShieldWaves = 0;
-  _lastTronoWave = 0;
+  readonly itemState = {
+    titanShieldCharges: 0,
+    titanShieldWaves: 0,
+    cataclysmTimer: 0,
+    lastTronoWave: 0,
+    lastItemWave: 0,
+  };
 
-  // Systems
+  // Core systems
   readonly itemSystem: ItemSystem;
   readonly combatSystem: CombatSystem;
   readonly effectSystem: EffectSystem;
   readonly bossSystem: BossSystem;
   readonly rewardSystem: RewardSystem;
+<<<<<<< HEAD
   readonly placement: TowerPlacementService;
 
   /** Central state store — exposes typed slice managers and the screen FSM. */
   readonly store!: StateStore;
+=======
+  readonly animations: AnimationSystem;
+
+  // Extracted services
+  readonly towerPlacement: TowerPlacementService;
+  readonly towerInteraction: TowerInteractionService;
+  readonly gameFlow: GameFlowController;
+  private readonly inputController: GameInputController;
+
+  // Map state (public for GameFlowController)
+  currentMapSeed = 1;
+  currentMapTier = 0;
+
+  /** Cell size for coordinate conversion */
+  readonly cellSize = CELL_SIZE;
+>>>>>>> 1c469a1146d67af2f97adc4a135ac76ed0d4bc07
 
   private lastTime = 0;
-  private currentMapSeed = 1;
-  private currentMapTier = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
 
-    // Register all content (towers, enemies, fusions, items) into registries
     registerAllContent();
 
-    // Create systems
+    // Core systems
     this.itemSystem = new ItemSystem();
     this.combatSystem = new CombatSystem(this.itemSystem);
     this.effectSystem = new EffectSystem();
     this.bossSystem = new BossSystem();
     this.rewardSystem = new RewardSystem(this.itemSystem);
+<<<<<<< HEAD
     this.placement = new TowerPlacementService(this.itemSystem);
+=======
+    this.animations = new AnimationSystem();
+>>>>>>> 1c469a1146d67af2f97adc4a135ac76ed0d4bc07
 
-    // Default map so renderer never crashes before game start
+    // Extracted services
+    this.towerPlacement = new TowerPlacementService(this.itemSystem);
+    this.towerInteraction = new TowerInteractionService();
+    this.gameFlow = new GameFlowController(this.itemSystem);
+    this.inputController = new GameInputController(this);
+
+    // Default map
     this.map = generateMap(1, 0);
     this.renderer = new Renderer(canvas, this.ctx, this.map);
     this.modal = new Modal();
+<<<<<<< HEAD
 
     // State store — wired after player/talentTree/waveManager exist
     (this as { store: StateStore }).store = new StateStore(this.map);
@@ -113,24 +153,28 @@ export class Game implements IGameContext {
     this.store.setAoeFlashHandler((x, y, r) => this.renderer.triggerAoe(x, y, r));
 
     this.setupInput();
+=======
+    this.inputController.setup();
+>>>>>>> 1c469a1146d67af2f97adc4a135ac76ed0d4bc07
   }
 
-  // ─── Input ──────────────────────────────────────────────────────────────────
-  private setupInput() {
-    this.canvas.addEventListener('mousemove', e => this.onMouseMove(e));
-    this.canvas.addEventListener('click',     e => this.onClick(e));
-    this.canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.onRightClick(e); });
-    window.addEventListener('keydown', e => this.onKeyDown(e));
+  // ─── Public delegates for services / input controller ───────────────────────
+
+  /** Called by GameInputController when archetype is selected */
+  selectArchetype(id: string): void {
+    this.player = new Player();
+    this.player.affinity = this.pendingAffinity;
+    this.player.applyArchetype(id);
+    this.screen = 'bonus' as GameScreen;
   }
 
-  private cvPos(e: MouseEvent): Vec2 {
-    const r = this.canvas.getBoundingClientRect();
-    return {
-      x: (e.clientX - r.left) * (this.canvas.width  / r.width),
-      y: (e.clientY - r.top)  * (this.canvas.height / r.height),
-    };
-  }
+  startNewGameFromBonus(): void { this.gameFlow.startNewGameFromBonus(this); }
+  startNewGame(affinity: ElementType, archetypeId: string): void { this.gameFlow.startNewGame(this, affinity, archetypeId); }
+  loadGameFromSave(): void { this.gameFlow.loadGameFromSave(this); }
+  hasSaveAvailable(): boolean { return this.gameFlow.hasSaveAvailable(); }
+  saveCurrentGame(): void { this.gameFlow.saveCurrentGame(this); }
 
+<<<<<<< HEAD
   private onMouseMove(e: MouseEvent) {
     this.mousePos = this.cvPos(e);
     if (this.screen === 'game') this.hoveredCell = this.px2grid(this.mousePos);
@@ -447,11 +491,20 @@ export class Game implements IGameContext {
     const nextTier = this.currentMapTier + 1;
     if (nextTier >= 4) return;
     const cost = Math.round(MAP_EXPAND_COST * (1 - this.itemSystem.getDiscount(this.items)));
+=======
+  expandMap(): void {
+    const nextTier = this.currentMapTier + 1;
+    if (nextTier >= GameConfig.get().map.tiers.length) return;
+    const cost = Math.round(
+      GameConfig.get().map.expandCost * (1 - this.itemSystem.getDiscount(this.items)),
+    );
+>>>>>>> 1c469a1146d67af2f97adc4a135ac76ed0d4bc07
     if (this.gold < cost) return;
     this.gold -= cost;
-    this.doExpandMap(nextTier);
+    this.gameFlow.doExpandMap(this, nextTier);
   }
 
+<<<<<<< HEAD
   private doExpandMap(tier: number) {
     const newSeed = (this.currentMapSeed * 1103515245 + 12345) & 0xffffff;
     this.map = extendMap(this.map, newSeed, tier);
@@ -591,9 +644,24 @@ export class Game implements IGameContext {
       },
       timestamp: Date.now(),
     });
+=======
+  // ─── Delegates for Renderer ─────────────────────────────────────────────────
+
+  towersAt(col: number, row: number): Tower[] {
+    return this.towerPlacement.towersAt(this.towers, col, row) as Tower[];
+  }
+
+  towerCost(typeId: string): number {
+    return this.towerPlacement.towerCost(typeId, this.towers, this.items);
+  }
+
+  towerUpgradeCost(tower?: Tower): number {
+    return this.towerPlacement.towerUpgradeCost(tower, this.items);
+>>>>>>> 1c469a1146d67af2f97adc4a135ac76ed0d4bc07
   }
 
   // ─── Loop ────────────────────────────────────────────────────────────────────
+
   start() { this.lastTime = performance.now(); requestAnimationFrame(this.loop); }
 
   private loop = (now: number) => {
@@ -608,52 +676,39 @@ export class Game implements IGameContext {
   };
 
   // ─── Update ─────────────────────────────────────────────────────────────────
+
   private update(dt: number) {
-    // Wave completion rewards (vitality regen, item drops, titan shield)
     this.rewardSystem.processWaveCompletion(this);
 
-    // Auto-start wave
     if (this.autoWave && this.waveManager.betweenWaves && !this.waveManager.waveActive) {
       this.waveManager.startWave();
     }
 
-    // Item wave-start hooks (e.g. Trono do Rei Goblin gold bonus)
-    if (this.waveManager.waveActive && this.waveManager.currentWave !== this._lastTronoWave) {
-      this._lastTronoWave = this.waveManager.currentWave;
+    if (this.waveManager.waveActive && this.waveManager.currentWave !== this.itemState.lastTronoWave) {
+      this.itemState.lastTronoWave = this.waveManager.currentWave;
       this.itemSystem.processWaveStart(this);
     }
 
-    // Auto map tier upgrade every 10 waves
     const expectedTier = MAP_TIER_AT(this.waveManager.currentWave);
     if (expectedTier > this.currentMapTier && this.waveManager.betweenWaves) {
-      this.doExpandMap(expectedTier);
+      this.gameFlow.doExpandMap(this, expectedTier);
     }
 
-    // Spawn enemies
     const newEnemies = this.waveManager.update(dt, this.enemies, this.map.waypoints, this.map.totalLength);
     this.itemSystem.applySlowAura(this, newEnemies);
     this.enemies.push(...newEnemies);
 
-    // Enemy end-of-path
-    if (this.rewardSystem.processEndOfPath(this)) return; // game over
+    if (this.rewardSystem.processEndOfPath(this)) return;
 
-    // Environmental effects (puddles, burn zones, cataclysm)
     this.effectSystem.update(this, dt);
-
-    // Boss abilities
     this.bossSystem.update(this, dt);
-
-    // Tower combat (targeting, shooting, magic, projectiles, hit resolution)
     this.combatSystem.update(this, dt);
-
-    // Collect kills and grant rewards
     this.rewardSystem.processKills(this);
+    this.animations.update(dt);
 
-    // Floating texts
     for (const f of this.floatingTexts) { f.y -= 40 * dt; f.life -= dt; }
     this.floatingTexts = this.floatingTexts.filter(f => f.life > 0);
 
-    // Item drop animation
     if (this.itemDropAnim) {
       this.itemDropAnim.timer += dt;
       const t = this.itemDropAnim.timer;
@@ -663,7 +718,6 @@ export class Game implements IGameContext {
       if (t >= this.itemDropAnim.totalTime) this.itemDropAnim = null;
     }
   }
-
 
   addFT(pos: Vec2, text: string, color: string) {
     this.floatingTexts.push({
@@ -681,6 +735,7 @@ export class Game implements IGameContext {
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
+
   private render() {
     this.renderer.setMousePos(this.mousePos);
     this.renderer.render({
@@ -702,7 +757,9 @@ export class Game implements IGameContext {
         currentMapTier: this.currentMapTier,
         items: this.items,
         itemDropAnim: this.itemDropAnim,
-        canFuse: this.upgradePopup ? this.canFuse(this.upgradePopup.col, this.upgradePopup.row) : false,
+        canFuse: this.upgradePopup
+          ? this.towerInteraction.canFuse(this.towers, this.upgradePopup.col, this.upgradePopup.row)
+          : false,
       },
       player: this.player,
       talentTree: this.talentTree,
@@ -718,6 +775,7 @@ export class Game implements IGameContext {
   }
 
   // ─── Debug Commands ─────────────────────────────────────────────────────────
+
   handleDebugClick(cmd: string) {
     if (!this.debugMode) return;
     switch (cmd) {
@@ -736,7 +794,6 @@ export class Game implements IGameContext {
         for (let i = 0; i < 10 && this.player.level < 50; i++) {
           this.player.level++;
           if (this.player.level % 10 === 0) this.player.talentPoints++;
-          // Auto-pick a random stat to avoid 10 level-up screens
           const keys: Array<'strength'|'intelligence'|'dexterity'|'agility'|'luck'|'vitality'> =
             ['strength','intelligence','dexterity','agility','luck','vitality'];
           this.player.stats[keys[Math.floor(Math.random() * keys.length)]]++;
@@ -769,8 +826,7 @@ export class Game implements IGameContext {
         this.enemies = [];
         break;
       }
-      case 'skip_wave':  {
-        // Kill all current enemies and force wave complete
+      case 'skip_wave': {
         for (const e of this.enemies) e.dead = true;
         this.enemies = [];
         this.waveManager.spawnQueues = [];
@@ -780,9 +836,7 @@ export class Game implements IGameContext {
         break;
       }
       case 'skip10': {
-        for (let i = 0; i < 10; i++) {
-          this.waveManager.currentWave++;
-        }
+        for (let i = 0; i < 10; i++) this.waveManager.currentWave++;
         this.waveManager.waveActive = false;
         this.waveManager.waveComplete = true;
         this.waveManager.betweenWaves = true;

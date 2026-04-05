@@ -3,6 +3,8 @@ import { createEnemy, resetEnemyIds } from '../entities/Enemy';
 import { enemyRegistry } from '../registries';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { Vec2 } from '../types';
+import type { WaveRules } from '../types/wave';
+import { DEFAULT_WAVE_RULES } from '../content/waveRules';
 
 const cfg = GameConfig.get();
 
@@ -21,24 +23,20 @@ function waveRng(seed: number) {
   };
 }
 
-/** Returns list of enemy type IDs available for a given wave number */
-function getEnemyPool(wave: number): string[] {
-  const pool: string[] = ['goblin'];
-  if (wave >= 3)  pool.push('troll');
-  if (wave >= 5)  pool.push('harpy');
-  if (wave >= 8)  pool.push('golem_fire', 'golem_water', 'golem_earth', 'golem_wind');
-  if (wave >= 12) pool.push('golem');
-  if (wave >= 15) pool.push('dragon');
-  return pool;
+/** Returns list of enemy type IDs available for a given wave from spawn rules */
+function getEnemyPool(wave: number, rules: WaveRules): string[] {
+  return rules.spawnPool
+    .filter(e => wave >= e.fromWave)
+    .map(e => e.typeId);
 }
 
-/** How many enemy types appear in a wave */
-function typeCountForWave(wave: number): number {
-  if (wave < 10)  return 1;
-  if (wave < 20)  return 2;
-  if (wave < 30)  return 3;
-  if (wave < 40)  return 4;
-  return 5;
+/** How many enemy types appear in a wave, from bracket rules */
+function typeCountForWave(wave: number, rules: WaveRules): number {
+  let result = 1;
+  for (const b of rules.typeCountBrackets) {
+    if (wave >= b.minWave) result = b.maxTypes;
+  }
+  return result;
 }
 
 /** Gradual elite multiplier: ramps from base to max */
@@ -63,8 +61,9 @@ export class WaveManager {
   isBossWave: boolean;
   totalEnemiesThisWave: number;
   enemiesKilledThisWave: number;
+  rules: WaveRules;
 
-  constructor() {
+  constructor(rules: WaveRules = DEFAULT_WAVE_RULES) {
     this.currentWave = 0;
     this.spawnQueues = [];
     this.waveActive  = false;
@@ -73,6 +72,7 @@ export class WaveManager {
     this.isBossWave   = false;
     this.totalEnemiesThisWave   = 0;
     this.enemiesKilledThisWave  = 0;
+    this.rules = rules;
   }
 
   reset() {
@@ -83,19 +83,19 @@ export class WaveManager {
   startWave() {
     if (this.waveActive) return;
     this.currentWave++;
-    this.isBossWave = this.currentWave % 10 === 0;
+    this.isBossWave = this.currentWave % this.rules.bossEveryN === 0;
 
     const rng = waveRng(this.currentWave * 1337 + 7);
 
     if (this.isBossWave) {
       const bossDefs = enemyRegistry.getBossDefs();
-      const bossIdx = Math.max(0, Math.floor((this.currentWave - 10) / 10)) % bossDefs.length;
+      const bossIdx = Math.max(0, Math.floor((this.currentWave - this.rules.bossEveryN) / this.rules.bossEveryN)) % bossDefs.length;
       const boss = bossDefs[bossIdx];
       this.spawnQueues = [{ typeId: boss.id, count: 1, timer: 0, spawned: 0, isBoss: true, isElite: false }];
     } else {
-      // Pick enemy types
-      const pool = getEnemyPool(this.currentWave);
-      const typeCount = Math.min(typeCountForWave(this.currentWave), pool.length);
+      // Pick enemy types from data-driven pool
+      const pool = getEnemyPool(this.currentWave, this.rules);
+      const typeCount = Math.min(typeCountForWave(this.currentWave, this.rules), pool.length);
       const chosen: string[] = [];
       const poolCopy = [...pool];
       for (let i = 0; i < typeCount; i++) {
@@ -148,7 +148,7 @@ export class WaveManager {
           const eliteMult = q.isElite ? eliteMultForWave(this.currentWave) : 1;
           // Use the factory — picks BossEnemy / GolemEnemy / StandardEnemy automatically
           const e = createEnemy(def, this.currentWave, eliteMult);
-          if (q.isElite) e._elite = true;  // mark for rendering
+          if (q.isElite) e.isElite = true;  // mark for rendering
           e.pos = { x: waypoints[0]?.x ?? 0, y: waypoints[0]?.y ?? 0 };
           spawned.push(e);
           q.spawned++;
@@ -170,15 +170,15 @@ export class WaveManager {
   /** Preview info for next wave (types, boss, elite count) */
   getNextWavePreview(): { types: string[]; isBoss: boolean; eliteCount: number; enemyCount: number } {
     const nextWave = this.currentWave + 1;
-    const isBoss = nextWave % 10 === 0;
+    const isBoss = nextWave % this.rules.bossEveryN === 0;
     if (isBoss) {
       const bossDefs = enemyRegistry.getBossDefs();
-      const bossIdx = Math.max(0, Math.floor((nextWave - 10) / 10)) % bossDefs.length;
+      const bossIdx = Math.max(0, Math.floor((nextWave - this.rules.bossEveryN) / this.rules.bossEveryN)) % bossDefs.length;
       return { types: [bossDefs[bossIdx].id], isBoss: true, eliteCount: 0, enemyCount: 1 };
     }
     const rng = waveRng(nextWave * 1337 + 7);
-    const pool = getEnemyPool(nextWave);
-    const typeCount = Math.min(typeCountForWave(nextWave), pool.length);
+    const pool = getEnemyPool(nextWave, this.rules);
+    const typeCount = Math.min(typeCountForWave(nextWave, this.rules), pool.length);
     const chosen: string[] = [];
     const poolCopy = [...pool];
     for (let i = 0; i < typeCount; i++) {

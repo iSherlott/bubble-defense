@@ -47,7 +47,6 @@ export function generateMap(seed: number, tier: number): MapData {
   let cy = startRow;
   pts.push({ col: cx, row: cy });
 
-  let turns = 0;
   while (cx < cols - 4) {
     // Horizontal advance
     const advance = cfg.minSegH + Math.floor(rng() * (cfg.maxSegH - cfg.minSegH + 1));
@@ -71,7 +70,6 @@ export function generateMap(seed: number, tier: number): MapData {
     if (nextCy !== cy) {
       pts.push({ col: cx, row: nextCy });
       cy = nextCy;
-      turns++;
     }
   }
 

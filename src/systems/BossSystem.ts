@@ -1,6 +1,5 @@
 import type { IGameContext } from '../core/GameContext';
 import { enemyRegistry } from '../registries';
-import { BossEnemy } from '../entities/enemies/BossEnemy';
 
 /**
  * BossSystem — processes boss-specific abilities using behaviors from the registry.

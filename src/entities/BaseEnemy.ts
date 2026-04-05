@@ -25,10 +25,10 @@ export abstract class BaseEnemy extends BaseEntity {
   dead: boolean;
   reachedEnd: boolean;
 
-  // Runtime flags set by systems (previously untyped `as any`)
-  _elite = false;
-  _trailTimer = 0;
-  _sandstormAcc: { amount: number; remaining: number } | null = null;
+  // Runtime state set by systems
+  isElite = false;
+  trailTimer = 0;
+  sandstormAcc: { amount: number; remaining: number } | null = null;
 
   /** Override in BossEnemy to reflect shield phase */
   get shieldActive(): boolean { return false; }

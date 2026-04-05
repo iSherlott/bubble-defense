@@ -25,18 +25,18 @@ export class RewardSystem {
 
     // Item drop every 10 waves
     const completedWave = ctx.waveManager.currentWave;
-    if (completedWave > 0 && completedWave % 10 === 0 && completedWave !== ctx.lastItemWave) {
-      ctx.lastItemWave = completedWave;
+    if (completedWave > 0 && completedWave % 10 === 0 && completedWave !== ctx.itemState.lastItemWave) {
+      ctx.itemState.lastItemWave = completedWave;
       this.itemSystem.rollItemDrop(ctx);
     }
 
     // Titan shield (Selo do Titã Sombrio): grant 1 shield charge every 3 waves
     const titanStacks = this.itemSystem.itemStacks('titan_seal', ctx.items);
     if (titanStacks > 0) {
-      ctx.titanShieldWaves++;
-      if (ctx.titanShieldWaves >= 3) {
-        ctx.titanShieldWaves = 0;
-        ctx.titanShieldCharges += titanStacks;
+      ctx.itemState.titanShieldWaves++;
+      if (ctx.itemState.titanShieldWaves >= 3) {
+        ctx.itemState.titanShieldWaves = 0;
+        ctx.itemState.titanShieldCharges += titanStacks;
         ctx.addFT({ x: ctx.map.gameWidth / 2, y: ctx.map.gameHeight / 2 - 30 }, `🛡 Escudo do Titã!`, '#cc44ff');
       }
     }
@@ -52,9 +52,9 @@ export class RewardSystem {
         e.dead = true;
         let lost = e.def.baseLivesLost;
         // Titan shield absorbs life losses
-        if (lost > 0 && ctx.titanShieldCharges > 0) {
-          const absorbed = Math.min(lost, ctx.titanShieldCharges);
-          ctx.titanShieldCharges -= absorbed;
+        if (lost > 0 && ctx.itemState.titanShieldCharges > 0) {
+          const absorbed = Math.min(lost, ctx.itemState.titanShieldCharges);
+          ctx.itemState.titanShieldCharges -= absorbed;
           lost -= absorbed;
           ctx.addFT(e.pos, `🛡 Bloqueado!`, '#cc44ff');
         }

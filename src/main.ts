@@ -1,5 +1,4 @@
 import { Game } from './game/Game';
-import { saveGame } from './game/SaveSystem';
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const game = new Game(canvas);

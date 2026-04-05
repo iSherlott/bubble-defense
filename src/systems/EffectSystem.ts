@@ -20,7 +20,7 @@ export class EffectSystem {
       for (const pu of ctx.puddles) {
         if (Math.hypot(e.pos.x - pu.x, e.pos.y - pu.y) <= pu.radius) {
           if (e.def.golemType === 'water') {
-            e.hp = Math.min(e.maxHp, e.hp + e.maxHp * GameConfig.get().combat.waterGolemPuddleRegen * dt * 60);
+            e.hp = Math.min(e.maxHp, e.hp + e.maxHp * GameConfig.get().combat.waterGolemPuddleRegen * dt);
           } else {
             e.applyTempSlow(pu.slowAmount, 0.5);
           }
@@ -48,9 +48,9 @@ export class EffectSystem {
     const hasRelic = ctx.items.some(i => i.defId === 'cataclysm_relic');
     if (!hasRelic || !ctx.waveManager.waveActive) return;
 
-    ctx.cataclysmTimer += dt;
-    if (ctx.cataclysmTimer >= 20) {
-      ctx.cataclysmTimer = 0;
+    ctx.itemState.cataclysmTimer += dt;
+    if (ctx.itemState.cataclysmTimer >= 20) {
+      ctx.itemState.cataclysmTimer = 0;
       this.fireCataclysm(ctx);
     }
   }
