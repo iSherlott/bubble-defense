@@ -14,6 +14,8 @@ export class OverlayRenderer {
   private talentBackRect: Rect | null = null;
   private bestiaryRects: Record<string, Rect> = {};
   private bestiaryPage = 0;
+  private bestiaryScroll = 0;
+  private bestiaryContentH = 0;
   private bestiarySource: 'game' | 'menu' = 'game';
   private gameOverBtns: Record<string, Rect> = {};
   private _mousePos: { x: number; y: number } | null = null;
@@ -222,7 +224,7 @@ export class OverlayRenderer {
     ctx.textAlign = 'center';
   }
 
-  renderBestiary(ctx: CanvasRenderingContext2D, cw: number, ch: number, returnScreen = 'game') {
+  renderBestiary(ctx: CanvasRenderingContext2D, cw: number, ch: number, _returnScreen = 'game') {
     this.bestiaryRects = {};
     ctx.fillStyle = '#080814'; ctx.fillRect(0, 0, cw, ch);
     ctx.textAlign = 'center';
