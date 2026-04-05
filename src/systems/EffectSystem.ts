@@ -12,6 +12,13 @@ export class EffectSystem {
     this.processPuddles(ctx, dt);
     this.processBurnZones(ctx, dt);
     this.processCataclysm(ctx, dt);
+    this.updateFloatingTexts(ctx, dt);
+  }
+
+  /** Tick and cull floating text particles */
+  private updateFloatingTexts(ctx: IGameContext, dt: number): void {
+    for (const f of ctx.floatingTexts) { f.y -= 40 * dt; f.life -= dt; }
+    ctx.floatingTexts = ctx.floatingTexts.filter(f => f.life > 0);
   }
 
   private processPuddles(ctx: IGameContext, dt: number): void {

@@ -220,16 +220,16 @@ export class GameInputController {
 
       // Move mode
       if (g.movingTower) {
-        g.towerPlacement.moveTower(g, g.movingTower, cell.x, cell.y);
+        g.towerService.moveTower(g, g.movingTower, cell.x, cell.y);
         g.movingTower = null;
         return;
       }
 
-      const here = g.towerPlacement.towersAt(g.towers, cell.x, cell.y);
+      const here = g.towerService.towersAt(g.towers, cell.x, cell.y);
       if (here.length > 0) {
         g.upgradePopup = { col: cell.x, row: cell.y };
       } else if (g.selectedTowerType) {
-        g.towerPlacement.placeTower(g, g.selectedTowerType, cell.x, cell.y, 0);
+        g.towerService.placeTower(g, g.selectedTowerType, cell.x, cell.y, 0);
         g.selectedTowerType = '';
       }
     }
@@ -244,26 +244,21 @@ export class GameInputController {
     for (let i = 0; i < 2; i++) {
       const k = `upgrade_${i}`;
       if (btns[k] && this.hit(p, btns[k])) {
-        const here = g.towerPlacement.towersAt(g.towers, popup.col, popup.row);
+        const here = g.towerService.towersAt(g.towers, popup.col, popup.row);
         if (here[i]) {
-          const upgCost = g.towerPlacement.towerUpgradeCost(here[i], g.items);
-          if (g.gold >= upgCost && !here[i].isMaxLevel) {
-            g.gold -= upgCost;
-            here[i].goldSpent += upgCost;
-            g.towerInteraction.upgradeTower(g, here[i]);
-          }
+          g.towerService.upgradeTower(g, here[i]);
         }
         return;
       }
       const sk = `sell_${i}`;
       if (btns[sk] && this.hit(p, btns[sk])) {
-        const here = g.towerPlacement.towersAt(g.towers, popup.col, popup.row);
-        if (here[i]) { g.towerPlacement.sellTower(g, here[i]); }
+        const here = g.towerService.towersAt(g.towers, popup.col, popup.row);
+        if (here[i]) { g.towerService.sellTower(g, here[i]); }
         g.upgradePopup = null; return;
       }
       const mk = `move_${i}`;
       if (btns[mk] && this.hit(p, btns[mk])) {
-        const here = g.towerPlacement.towersAt(g.towers, popup.col, popup.row);
+        const here = g.towerService.towersAt(g.towers, popup.col, popup.row);
         if (here[i]) { g.movingTower = here[i]; }
         g.upgradePopup = null; return;
       }
@@ -273,14 +268,14 @@ export class GameInputController {
     for (const def of towerRegistry.getAllDefs()) {
       const k = `addSecond_${def.id}`;
       if (btns[k] && this.hit(p, btns[k])) {
-        g.towerPlacement.placeSecondTower(g, def.id, popup.col, popup.row);
+        g.towerService.placeTower(g, def.id, popup.col, popup.row, 1);
         g.upgradePopup = null; return;
       }
     }
 
     // Fusion button
     if (btns['fusion'] && this.hit(p, btns['fusion'])) {
-      g.towerInteraction.fuseTowers(g, popup.col, popup.row);
+      g.towerService.fuseTowers(g, popup.col, popup.row);
       g.upgradePopup = null; return;
     }
 
@@ -296,7 +291,7 @@ export class GameInputController {
       }
     }
     const cell = this.px2grid(p);
-    const here = g.towerPlacement.towersAt(g.towers, cell.x, cell.y);
+    const here = g.towerService.towersAt(g.towers, cell.x, cell.y);
     if (here.length > 0) g.modal.showTower(here[0], g.player.stats, g.talentTree);
   }
 }

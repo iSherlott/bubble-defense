@@ -45,16 +45,20 @@ import {
   fourTidesCrownEffect, cataclysmRelicEffect,
 } from '../behaviors/ItemEffects';
 
-import type { MagicBehavior, FusionBehavior } from '../behaviors/types';
+import type { FusionBehavior } from '../behaviors/types';
 import { registerEnemyRenderProfiles } from './enemyRenderProfiles';
+import { registerAnimations } from './animations';
+import { registerEnemyBehavior, getEnemyBehavior } from '../registries/EnemyBehaviorRegistry';
+import { registerMagicBehavior, getMagicBehavior } from '../registries/MagicBehaviorRegistry';
+import { DEFAULT_WAVE_RULES } from './waveRules';
 
-// ─── Magic behavior map ────────────────────────────────────────────────────────
-const magicBehaviors: Record<string, MagicBehavior> = {
-  fire:  new FireMagicBehavior(),
-  water: new WaterMagicBehavior(),
-  earth: new EarthMagicBehavior(),
-  wind:  new WindMagicBehavior(),
-};
+// ─── Magic behavior instances ──────────────────────────────────────────────
+// Register all magic behaviors so they can be looked up by ID.
+// To add a new magic behavior: create the class, register it here with a unique ID.
+registerMagicBehavior('fire',  new FireMagicBehavior());
+registerMagicBehavior('water', new WaterMagicBehavior());
+registerMagicBehavior('earth', new EarthMagicBehavior());
+registerMagicBehavior('wind',  new WindMagicBehavior());
 
 // ─── Fusion behavior map ───────────────────────────────────────────────────────
 const fusionBehaviors: Record<string, FusionBehavior> = {
@@ -101,40 +105,53 @@ const itemEffects: Record<string, import('../behaviors/types').ItemEffect> = {
   cataclysm_relic:    cataclysmRelicEffect,
 };
 
-// ─── Boss behavior instances ───────────────────────────────────────────────────
-const bossBehaviors: Record<string, import('../behaviors/types').EnemyBehavior> = {
-  summon_adds:  new SummonAddsBehavior(),
-  fire_trail:   new FireTrailBehavior(),
-  shield_phase: new ShieldPhaseBehavior(),
-};
+// ─── Enemy behavior instances ──────────────────────────────────────────────
+// Register all behaviors in the behavior registry so they can be looked up by ID.
+// To add a new behavior: create the class, instantiate it here, call registerEnemyBehavior().
+registerEnemyBehavior(new SummonAddsBehavior());
+registerEnemyBehavior(new FireTrailBehavior());
+registerEnemyBehavior(new ShieldPhaseBehavior());
 
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/** Resolve behavior IDs for an EnemyDef (supports both behaviorIds and legacy bossAbility). */
+function resolveBehaviorIds(def: import('../types').EnemyDef): string[] {
+  if (def.behaviorIds && def.behaviorIds.length > 0) return def.behaviorIds;
+  // Legacy fallback: bossAbility → single-item array
+  if (def.bossAbility) return [def.bossAbility];
+  return [];
+}
+
+/** Look up EnemyBehavior instances from the behavior registry by IDs. Warns on missing. */
+function resolveBehaviors(def: import('../types').EnemyDef): import('../behaviors/types').EnemyBehavior[] {
+  const ids = resolveBehaviorIds(def);
+  const result: import('../behaviors/types').EnemyBehavior[] = [];
+  for (const id of ids) {
+    const b = getEnemyBehavior(id);
+    if (b) { result.push(b); }
+    else { console.warn(`[registerAll] Enemy '${def.id}' references unknown behavior '${id}'`); }
+  }
+  return result;
+}
 
 export function registerAllContent(): void {
   // ── Towers ──────────────────────────────────────────────────────────────────
   for (const def of TOWER_DEFS) {
+    const behaviorId = def.magicBehaviorId ?? def.element;
+    const magicBehavior = getMagicBehavior(behaviorId);
+    if (!magicBehavior) {
+      console.warn(`[registerAll] Tower '${def.id}' references unknown magic behavior '${behaviorId}'`);
+    }
     towerRegistry.register({
       def,
-      magicBehavior: magicBehaviors[def.magicBehaviorId ?? def.element] ?? magicBehaviors.fire,
+      magicBehavior: magicBehavior ?? getMagicBehavior('fire')!,
     });
   }
 
-  // ── Enemies (standard) ──────────────────────────────────────────────────────
-  for (const def of ENEMY_DEFS) {
-    enemyRegistry.register({ def, behaviors: [] });
-  }
-
-  // ── Golems ──────────────────────────────────────────────────────────────────
-  for (const def of GOLEM_DEFS) {
-    enemyRegistry.register({ def, behaviors: [] });
-  }
-
-  // ── Bosses ──────────────────────────────────────────────────────────────────
-  for (const def of BOSS_DEFS) {
-    const behaviors = def.bossAbility && bossBehaviors[def.bossAbility]
-      ? [bossBehaviors[def.bossAbility]]
-      : [];
-    enemyRegistry.register({ def, behaviors });
+  // ── Enemies (all types — standard, golems, bosses) ─────────────────────────
+  const allEnemyDefs = [...ENEMY_DEFS, ...GOLEM_DEFS, ...BOSS_DEFS];
+  for (const def of allEnemyDefs) {
+    enemyRegistry.register({ def, behaviors: resolveBehaviors(def) });
   }
 
   // ── Fusions ─────────────────────────────────────────────────────────────────
@@ -153,4 +170,22 @@ export function registerAllContent(): void {
 
   // ── Enemy Render Profiles ──────────────────────────────────────────────────
   registerEnemyRenderProfiles();
+
+  // ── Animations ─────────────────────────────────────────────────────────────
+  registerAnimations();
+
+  // ── Startup Validation ─────────────────────────────────────────────────────
+  for (const entry of DEFAULT_WAVE_RULES.spawnPool) {
+    if (!enemyRegistry.has(entry.typeId)) {
+      console.warn(`[registerAll] Wave rule references unknown enemy '${entry.typeId}'`);
+    }
+  }
+  for (const def of FUSION_DEFS) {
+    if (!towerRegistry.has(def.primaryElement)) {
+      console.warn(`[registerAll] Fusion '${def.id}' references unknown primary tower '${def.primaryElement}'`);
+    }
+    if (!towerRegistry.has(def.secondaryElement)) {
+      console.warn(`[registerAll] Fusion '${def.id}' references unknown secondary tower '${def.secondaryElement}'`);
+    }
+  }
 }

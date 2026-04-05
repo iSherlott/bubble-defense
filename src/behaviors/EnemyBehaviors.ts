@@ -2,7 +2,7 @@ import type { EnemyBehavior } from './types';
 import type { IGameContext } from '../core/GameContext';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import { BossEnemy } from '../entities/enemies/BossEnemy';
-import { createEnemy } from '../entities/Enemy';
+import { createEnemy } from '../factories/EnemyFactory';
 import { enemyRegistry } from '../registries';
 
 // ─── Summon Adds (Goblin King) ───────────────────────────────────────────────

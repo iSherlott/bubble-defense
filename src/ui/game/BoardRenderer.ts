@@ -1,21 +1,14 @@
-import type { ElementType } from '../../types';
-import type { BaseTower as Tower } from '../../entities/BaseTower';
-import type { BaseEnemy as Enemy } from '../../entities/BaseEnemy';
-import type { MapData } from '../../game/MapGenerator';
+import type { MapData } from '../../systems/MapGenerator';
 import type { GameRenderState } from '../GameRenderer';
 import { CELL_SIZE } from '../../constants';
 import { ELEMENT_COLORS } from '../../constants';
 import { towerRegistry } from '../../registries';
 import type { EntityRenderer } from '../EntityRenderer';
 
-interface AoeFlash { x: number; y: number; r: number; life: number; }
+import { AnimationRenderer } from '../AnimationRenderer';
 
 export class BoardRenderer {
-  aoeFlashes: AoeFlash[] = [];
-
-  triggerAoe(x: number, y: number, r: number) {
-    this.aoeFlashes.push({ x, y, r, life: 0.35 });
-  }
+  private animRenderer = new AnimationRenderer();
 
   render(
     ctx: CanvasRenderingContext2D,
@@ -68,18 +61,14 @@ export class BoardRenderer {
       ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
 
-    // AoE flashes
-    for (const f of this.aoeFlashes) {
-      const a = (f.life / 0.35) * 0.4;
-      ctx.fillStyle = `rgba(150,220,80,${a})`; ctx.strokeStyle = `rgba(180,255,100,${a + 0.2})`;
-      ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    }
+    // Pluggable animations (aoe_flash, frost_nova, fire_burst, etc.)
+    this.animRenderer.render(ctx, g.animationInstances);
 
     // Hover highlight
     if (g.hoveredCell && g.hoveredCell.x < cols && g.hoveredCell.y < rows) {
       const hc = g.hoveredCell;
       const isMoving = !!g.movingTower;
-      const blocked = pathCells.has(`${hc.x},${hc.y}`) || (!isMoving && state.towersAt(hc.x, hc.y).length >= 2);
+      const blocked = pathCells.has(`${hc.x},${hc.y}`) || (!isMoving && state.isCellFull(hc.x, hc.y));
       ctx.fillStyle = isMoving ? 'rgba(100,200,255,0.12)' : blocked ? 'rgba(255,50,50,0.10)' : 'rgba(100,255,100,0.10)';
       ctx.strokeStyle = isMoving ? 'rgba(100,200,255,0.6)' : blocked ? 'rgba(255,50,50,0.5)' : 'rgba(100,255,100,0.5)';
       ctx.lineWidth = 1;

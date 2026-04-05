@@ -26,6 +26,8 @@ export interface TowerDef {
   magicBarGain: number;   // charge gained per normal shot (hit or miss)
   magicBaseDamage: number;
   description: string;
+  /** Short label for the sidebar describing magic effect. */
+  magicDescription?: string;
 
   // ── Behavior IDs (optional — defaults to element-based lookup) ──
   /** Magic behavior to use. Defaults to element if not set. */
@@ -54,7 +56,10 @@ export interface EnemyDef {
   xp: number;
   description: string;
   isBoss?: boolean;
-  bossAbility?: 'summon_adds' | 'fire_trail' | 'shield_phase';
+  /** @deprecated Use behaviorIds instead. Kept for backward compatibility. */
+  bossAbility?: string;
+  /** Behavior IDs to attach from the enemy behavior registry. Works on any enemy type. */
+  behaviorIds?: string[];
   golemType?: ElementType;   // elemental golem variant with special ability
   isElite?: boolean;         // elite unit (set at runtime, 10× power)
   /** Render profile ID for visual appearance. Defaults to enemy id if not set. */

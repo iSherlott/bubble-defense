@@ -17,3 +17,5 @@ export type { EnemyBlueprint } from './EnemyRegistry';
 export { FusionRegistry } from './FusionRegistry';
 export type { FusionBlueprint } from './FusionRegistry';
 export { ItemRegistry } from './ItemRegistry';
+export { registerEnemyBehavior, getEnemyBehavior, hasEnemyBehavior } from './EnemyBehaviorRegistry';
+export { registerMagicBehavior, getMagicBehavior, hasMagicBehavior } from './MagicBehaviorRegistry';

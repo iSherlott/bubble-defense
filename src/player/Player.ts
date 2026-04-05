@@ -1,6 +1,6 @@
 import type { Stats, StatKey, ElementType } from '../types';
 import { XP_TABLE, MAX_LEVEL, TALENT_POINT_EVERY,
-  MIN_STAT_VALUE, STARTING_STAT_TOTAL, ARCHETYPE_DEFS } from '../constants';
+  STARTING_STAT_TOTAL, ARCHETYPE_DEFS } from '../constants';
 import { GameConfig } from '../config';
 
 const C = GameConfig.get();
@@ -51,23 +51,6 @@ export class Player {
     this.stats[stat]++;
     this.bonusPoints--;
     return true;
-  }
-
-  /**
-   * Legacy: Generates random stats. Kept as fallback.
-   */
-  generateStartingStats(): void {
-    const keys: StatKey[] = ['strength','intelligence','dexterity','agility','luck','vitality'];
-    const s: Stats = { strength: MIN_STAT_VALUE, intelligence: MIN_STAT_VALUE,
-      dexterity: MIN_STAT_VALUE, agility: MIN_STAT_VALUE,
-      luck: MIN_STAT_VALUE, vitality: MIN_STAT_VALUE };
-    let remaining = STARTING_STAT_TOTAL - keys.length * MIN_STAT_VALUE;
-    while (remaining > 0) {
-      const key = keys[Math.floor(Math.random() * keys.length)];
-      s[key]++;
-      remaining--;
-    }
-    this.stats = s;
   }
 
   // ─── XP & Leveling ────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import type { FusionBehavior } from './types';
 import type { IGameContext } from '../core/GameContext';
 import type { BaseTower } from '../entities/BaseTower';
 import type { ProjectileData, FusionDef, DamageComponent } from '../types';
-import { createProjectile } from '../entities/Projectile';
+import { createProjectile } from '../factories/ProjectileFactory';
 import { CELL_SIZE } from '../constants';
 import { GameConfig } from '../config';
 

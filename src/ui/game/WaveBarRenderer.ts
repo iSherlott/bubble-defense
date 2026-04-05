@@ -1,7 +1,8 @@
-import type { BaseEnemy as Enemy } from '../../entities/BaseEnemy';
-import type { WaveManager } from '../../game/WaveManager';
+import type { WaveManager } from '../../systems/WaveManager';
 import { SIDEBAR_W, WAVE_BAR_H } from '../../constants';
 import { enemyRegistry } from '../../registries';
+
+export type BossBarState = { active: false } | { active: true; hp: number; maxHp: number; ratio: number };
 
 export class WaveBarRenderer {
   render(
@@ -9,7 +10,7 @@ export class WaveBarRenderer {
     gw: number,
     gh: number,
     wm: WaveManager,
-    enemies: Enemy[],
+    bossBar: BossBarState,
   ) {
     const barY = gh;
     const barW = gw;
@@ -20,15 +21,14 @@ export class WaveBarRenderer {
 
     if (wm.waveActive) {
       if (wm.isBossWave) {
-        const boss = enemies.find(e => e.def.isBoss && !e.dead);
-        const pct = boss ? boss.hp / boss.maxHp : wm.waveProgress;
+        const pct = bossBar.active ? bossBar.ratio : wm.waveProgress;
         ctx.fillStyle = '#1a0a14'; ctx.fillRect(8, barY + 6, barW - 16, WAVE_BAR_H - 12);
         const grad = ctx.createLinearGradient(8, 0, barW - 8, 0);
         grad.addColorStop(0, '#cc0044'); grad.addColorStop(1, '#ff4488');
         ctx.fillStyle = grad;
         ctx.fillRect(8, barY + 6, (barW - 16) * pct, WAVE_BAR_H - 12);
         ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center';
-        const hpText = boss ? `${Math.round(boss.hp)} / ${boss.maxHp}` : 'Derrotado!';
+        const hpText = bossBar.active ? `${Math.round(bossBar.hp)} / ${bossBar.maxHp}` : 'Derrotado!';
         ctx.fillText(`💀 BOSS — ${hpText}  (${Math.round(pct * 100)}%)`, barW / 2, barY + WAVE_BAR_H / 2 + 4);
       } else {
         const pct = wm.waveProgress;

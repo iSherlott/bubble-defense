@@ -5,18 +5,17 @@ import type { ElementType, FusionDef } from '../types';
 import type { Game } from './Game';
 import { Player } from '../player/Player';
 import { SkillTree as TalentTree } from '../player/SkillTree';
-import { WaveManager } from './WaveManager';
-import { generateMap, extendMap } from './MapGenerator';
-import { saveGame, loadGame, hasSave } from './SaveSystem';
-import { resetTowerIds } from '../entities/Tower';
-import { resetProjectileIds } from '../entities/Projectile';
-import { createTower } from '../entities/Tower';
+import { WaveManager } from '../systems/WaveManager';
+import { generateMap, extendMap } from '../systems/MapGenerator';
+import { saveGame, loadGame, hasSave } from '../services/SaveSystem';
+import { resetTowerIds, createTower } from '../factories/TowerFactory';
+import { resetProjectileIds } from '../factories/ProjectileFactory';
 import { towerRegistry, fusionRegistry } from '../registries';
-import { INITIAL_GOLD, BASE_LIVES, MAP_TIER_AT, MAP_EXPAND_COST } from '../constants';
-import type { ItemSystem } from '../systems/ItemSystem';
+import { INITIAL_GOLD, BASE_LIVES, MAP_TIER_AT } from '../constants';
+import { GameConfig } from '../config';
 
 export class GameFlowController {
-  constructor(private itemSystem: ItemSystem) {}
+  constructor() {}
 
   /** Reset all game state for a new run */
   initState(g: Game): void {
@@ -67,11 +66,19 @@ export class GameFlowController {
   /** Expand the map to the next tier */
   expandMap(g: Game): void {
     const nextTier = g.currentMapTier + 1;
-    if (nextTier >= (g.map as any).tier + 10) return; // safety check
-    const cost = Math.round(MAP_EXPAND_COST * (1 - this.itemSystem.getDiscount(g.items)));
+    if (nextTier >= GameConfig.get().map.tiers.length) return;
+    const cost = g.towerService.getMapExpandCost(g.items);
     if (g.gold < cost) return;
     g.gold -= cost;
     this.doExpandMap(g, nextTier);
+  }
+
+  /** Select archetype, create player, and transition to bonus screen */
+  selectArchetype(g: Game, id: string, affinity: ElementType): void {
+    g.player = new Player();
+    g.player.affinity = affinity;
+    g.player.applyArchetype(id);
+    g.screen = 'bonus' as any;
   }
 
   /** Internal: expand map to a specific tier */

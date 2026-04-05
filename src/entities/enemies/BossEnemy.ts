@@ -47,7 +47,7 @@ export class BossEnemy extends BaseEnemy {
 
   /** Attempt to trigger shield phase at 50% HP — call from Game.ts on damage */
   tryTriggerShield(): boolean {
-    if (this.def.bossAbility !== 'shield_phase') return false;
+    if (!this.hasBehavior('shield_phase')) return false;
     if (this.shieldTriggered) return false;
     if (this.hp / this.maxHp <= 0.5) {
       this.shieldActive    = true;
@@ -60,7 +60,7 @@ export class BossEnemy extends BaseEnemy {
 
   /** Returns which add-spawn threshold (1,2,3) just triggered, or 0 if none */
   checkAddSpawn(): number {
-    if (this.def.bossAbility !== 'summon_adds') return 0;
+    if (!this.hasBehavior('summon_adds')) return 0;
     const ratio = this.hp / this.maxHp;
     const threshold = Math.ceil(ratio / 0.25);  // 3→75%, 2→50%, 1→25%
     const needed = 3 - this.addsSpawned;        // thresholds not yet triggered
@@ -69,5 +69,10 @@ export class BossEnemy extends BaseEnemy {
       return needed;
     }
     return 0;
+  }
+
+  /** Check if this boss has a specific behavior attached via def */
+  private hasBehavior(id: string): boolean {
+    return this.def.behaviorIds?.includes(id) || this.def.bossAbility === id;
   }
 }

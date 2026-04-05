@@ -1,5 +1,5 @@
 import type { ProjectileData, ElementType, DamageComponent } from '../types';
-import type { BaseEnemy } from './BaseEnemy';
+import type { BaseEnemy } from '../entities/BaseEnemy';
 
 let _nextProjId = 1;
 export function resetProjectileIds() { _nextProjId = 1; }

@@ -1,7 +1,7 @@
-import type { Enemy } from '../entities/Enemy';
-import type { Tower } from '../entities/Tower';
+import type { StandardEnemy as Enemy } from '../entities/enemies/StandardEnemy';
+import type { SingleTower as Tower } from '../entities/towers/SingleTower';
 import type { Stats } from '../types';
-import type { TalentTree } from '../player/TalentTree';
+import type { SkillTree as TalentTree } from '../player/SkillTree';
 import { ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS, MAX_TOWER_LEVEL } from '../constants';
 
 export class Modal {

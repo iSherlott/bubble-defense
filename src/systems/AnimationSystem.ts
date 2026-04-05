@@ -1,24 +1,31 @@
-import type { AnimationRequest, ActiveAnimation, IAnimationProvider } from '../animations/types';
+import type { AnimationRequest, AnimationInstance } from '../types/animation';
+import { getAnimationDef } from '../registries/AnimationRegistry';
 
 /**
- * AnimationSystem — manages visual animations decoupled from gameplay logic.
+ * AnimationSystem — manages the lifecycle of pluggable visual animations.
  *
- * Behaviors and systems emit animation requests via play().
- * The system ticks elapsed time and expires completed animations.
- * Renderers query getActive() / getByType() to draw what's live.
+ * Flow: request(req) → registry lookup → AnimationInstance created → update(dt) ticks → renderer draws → instance dies.
+ * Each AnimationInstance carries a back-reference to its AnimationDefinition, which owns the draw() logic.
  */
-export class AnimationSystem implements IAnimationProvider {
-  private animations: ActiveAnimation[] = [];
+export class AnimationSystem {
+  private instances: AnimationInstance[] = [];
 
-  /** Queue a new animation */
-  play(req: AnimationRequest): void {
-    this.animations.push({
-      id: req.id,
+  /**
+   * Request a new animation by ID.
+   * Looks up the AnimationDefinition in the registry.
+   * Silently ignores unknown IDs (graceful degradation).
+   */
+  request(req: AnimationRequest): void {
+    const def = getAnimationDef(req.id);
+    if (!def) return;  // unknown animation — skip silently
+
+    this.instances.push({
+      def,
       sourceX: req.sourceX,
       sourceY: req.sourceY,
       targetX: req.targetX ?? req.sourceX,
       targetY: req.targetY ?? req.sourceY,
-      duration: req.duration,
+      duration: req.duration ?? def.defaultDuration,
       radius: req.radius ?? 0,
       elapsed: 0,
       progress: 0,
@@ -28,27 +35,27 @@ export class AnimationSystem implements IAnimationProvider {
     });
   }
 
-  /** Tick all active animations, removing expired ones */
+  /** Tick all active instances, removing expired ones */
   update(dt: number): void {
-    for (const anim of this.animations) {
-      anim.elapsed += dt;
-      anim.progress = Math.min(1, anim.elapsed / anim.duration);
+    for (const inst of this.instances) {
+      inst.elapsed += dt;
+      inst.progress = Math.min(1, inst.elapsed / inst.duration);
     }
-    this.animations = this.animations.filter(a => a.progress < 1);
+    this.instances = this.instances.filter(i => i.progress < 1);
   }
 
-  /** Get all currently active animations */
-  getActive(): ReadonlyArray<ActiveAnimation> {
-    return this.animations;
+  /** Get all currently active animation instances */
+  getActive(): ReadonlyArray<AnimationInstance> {
+    return this.instances;
   }
 
-  /** Get active animations filtered by type */
-  getByType(id: string): ReadonlyArray<ActiveAnimation> {
-    return this.animations.filter(a => a.id === id);
+  /** Get active instances filtered by animation ID */
+  getByType(id: string): ReadonlyArray<AnimationInstance> {
+    return this.instances.filter(i => i.def.id === id);
   }
 
   /** Remove all active animations */
   clear(): void {
-    this.animations = [];
+    this.instances = [];
   }
 }

@@ -4,7 +4,7 @@
 
 import type { EnemyDef, ActiveEffect, ElementType, Vec2 } from '../types';
 import { BaseEntity, nextEntityId } from './BaseEntity';
-import { positionOnPath } from '../game/MapGenerator';
+import { positionOnPath } from '../systems/MapGenerator';
 import { GameConfig } from '../config';
 
 const cfg = GameConfig.get();
