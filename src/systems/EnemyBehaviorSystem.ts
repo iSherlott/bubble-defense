@@ -2,14 +2,14 @@ import type { IGameContext } from '../core/GameContext';
 import { enemyRegistry } from '../registries';
 
 /**
- * BossSystem — processes boss-specific abilities using behaviors from the registry.
- * Extracted from Game.ts processBossAbilities().
+ * EnemyBehaviorSystem — processes enemy-specific abilities using behaviors from the registry.
+ * Runs on ANY enemy that has registered behaviors (bosses, specials, etc.).
  */
-export class BossSystem {
+export class EnemyBehaviorSystem {
 
   update(ctx: IGameContext, dt: number): void {
     for (const e of ctx.enemies) {
-      if (e.dead || !e.def.isBoss) continue;
+      if (e.dead) continue;
 
       // Look up behaviors from registry
       const blueprint = enemyRegistry.get(e.def.id);

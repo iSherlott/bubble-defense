@@ -4,9 +4,9 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import type { Vec2, OwnedItem, ItemDropAnim, ProjectileData, Puddle } from '../types';
-import type { Tower } from '../entities/Tower';
+import type { SingleTower as Tower } from '../entities/towers/SingleTower';
 import type { BaseEnemy } from '../entities/BaseEnemy';
-import type { MapData } from '../game/MapGenerator';
+import type { MapData } from '../systems/MapGenerator';
 import type { BurnZone, FloatingText } from '../core/GameContext';
 
 // ─── Per-domain slice interfaces ──────────────────────────────────────────────

@@ -20,10 +20,11 @@ import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { ProjectileData, Puddle, Vec2, OwnedItem, ItemDropAnim, GameScreen } from '../types';
 import type { Player } from '../player/Player';
 import type { SkillTree } from '../player/SkillTree';
-import type { WaveManager } from '../game/WaveManager';
-import type { MapData } from '../game/MapGenerator';
+import type { WaveManager } from '../systems/WaveManager';
+import type { MapData } from '../systems/MapGenerator';
 import type { IGameContext, FloatingText, BurnZone, ItemState } from '../core/GameContext';
-import type { Tower } from '../entities/Tower';
+import type { SingleTower as Tower } from '../entities/towers/SingleTower';
+import type { AnimationSystem } from '../systems/AnimationSystem';
 
 import { GameState, createInitialState } from './GameState';
 import { TowerSlice }    from './slices/TowerSlice';
@@ -53,6 +54,7 @@ export class StateStore implements IGameContext {
   player!: Player;
   talentTree!: SkillTree;
   waveManager!: WaveManager;
+  animations!: AnimationSystem;
 
   private _state: GameState;
 

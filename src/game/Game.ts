@@ -1,32 +1,28 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim } from '../types';
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
 import { CELL_SIZE, BASE_LIVES, INITIAL_GOLD, MAP_TIER_AT } from '../constants';
-import { GameConfig } from '../config';
-import { Tower } from '../entities/Tower';
+import { SingleTower as Tower } from '../entities/towers/SingleTower';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import { Player } from '../player/Player';
 import { SkillTree as TalentTree } from '../player/SkillTree';
-import { WaveManager } from './WaveManager';
-import { generateMap } from './MapGenerator';
-import type { MapData } from './MapGenerator';
+import { WaveManager } from '../systems/WaveManager';
+import { generateMap } from '../systems/MapGenerator';
+import type { MapData } from '../systems/MapGenerator';
 import { Renderer } from '../ui/Renderer';
 import { Modal } from '../ui/Modal';
 import type { IGameContext, FloatingText, BurnZone } from '../core/GameContext';
 import { ItemSystem } from '../systems/ItemSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { EffectSystem } from '../systems/EffectSystem';
-import { BossSystem } from '../systems/BossSystem';
+import { EnemyBehaviorSystem } from '../systems/EnemyBehaviorSystem';
 import { RewardSystem } from '../systems/RewardSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { StateStore } from '../state/StateStore';
-import { registerAllContent } from '../content/registerAll';
 
 // ── Extracted Services ────────────────────────────────────────────────────────
-import { TowerPlacementService } from './TowerPlacementService';
-import { TowerInteractionService } from './TowerInteractionService';
+import { TowerService } from '../services/TowerService';
 import { GameInputController } from './GameInputController';
 import { GameFlowController } from './GameFlowController';
-
-export interface UpgradePopup { col: number; row: number; }
+import { DebugService } from '../services/DebugService';
 
 export class Game implements IGameContext {
   canvas: HTMLCanvasElement;
@@ -79,14 +75,14 @@ export class Game implements IGameContext {
   readonly itemSystem: ItemSystem;
   readonly combatSystem: CombatSystem;
   readonly effectSystem: EffectSystem;
-  readonly bossSystem: BossSystem;
+  readonly enemyBehaviors: EnemyBehaviorSystem;
   readonly rewardSystem: RewardSystem;
   readonly animations: AnimationSystem;
 
   // Extracted services
-  readonly towerPlacement: TowerPlacementService;
-  readonly towerInteraction: TowerInteractionService;
+  readonly towerService: TowerService;
   readonly gameFlow: GameFlowController;
+  readonly debugService: DebugService;
   private readonly inputController: GameInputController;
 
   // Map state (public for GameFlowController)
@@ -105,20 +101,18 @@ export class Game implements IGameContext {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
 
-    registerAllContent();
-
     // Core systems
     this.itemSystem = new ItemSystem();
     this.combatSystem = new CombatSystem(this.itemSystem);
     this.effectSystem = new EffectSystem();
-    this.bossSystem = new BossSystem();
+    this.enemyBehaviors = new EnemyBehaviorSystem();
     this.rewardSystem = new RewardSystem(this.itemSystem);
     this.animations = new AnimationSystem();
 
     // Extracted services
-    this.towerPlacement = new TowerPlacementService(this.itemSystem);
-    this.towerInteraction = new TowerInteractionService();
-    this.gameFlow = new GameFlowController(this.itemSystem);
+    this.towerService = new TowerService(this.itemSystem);
+    this.gameFlow = new GameFlowController();
+    this.debugService = new DebugService(this.itemSystem);
     this.inputController = new GameInputController(this);
 
     // Default map
@@ -129,51 +123,23 @@ export class Game implements IGameContext {
     // State store — wired after player/talentTree/waveManager exist
     (this as { store: StateStore }).store = new StateStore(this.map);
     this.store.wire(this.player, this.talentTree, this.waveManager, () => this.gameFlow.hasSaveAvailable());
-    this.store.setAoeFlashHandler((x, y, r) => this.renderer.triggerAoe(x, y, r));
+    this.store.animations = this.animations;
+    this.store.setAoeFlashHandler((x, y, r) => this.animations.request({ id: 'aoe_flash', sourceX: x, sourceY: y, radius: r }));
 
     this.inputController.setup();
   }
 
   // ─── Public delegates for services / input controller ───────────────────────
 
-  /** Called by GameInputController when archetype is selected */
-  selectArchetype(id: string): void {
-    this.player = new Player();
-    this.player.affinity = this.pendingAffinity;
-    this.player.applyArchetype(id);
-    this.screen = 'bonus' as GameScreen;
-  }
+  selectArchetype(id: string): void { this.gameFlow.selectArchetype(this, id, this.pendingAffinity); }
 
   startNewGameFromBonus(): void { this.gameFlow.startNewGameFromBonus(this); }
   startNewGame(affinity: ElementType, archetypeId: string): void { this.gameFlow.startNewGame(this, affinity, archetypeId); }
   loadGameFromSave(): void { this.gameFlow.loadGameFromSave(this); }
   hasSaveAvailable(): boolean { return this.gameFlow.hasSaveAvailable(); }
   saveCurrentGame(): void { this.gameFlow.saveCurrentGame(this); }
+  expandMap(): void { this.gameFlow.expandMap(this); }
 
-  expandMap(): void {
-    const nextTier = this.currentMapTier + 1;
-    if (nextTier >= GameConfig.get().map.tiers.length) return;
-    const cost = Math.round(
-      GameConfig.get().map.expandCost * (1 - this.itemSystem.getDiscount(this.items)),
-    );
-    if (this.gold < cost) return;
-    this.gold -= cost;
-    this.gameFlow.doExpandMap(this, nextTier);
-  }
-
-  // ─── Delegates for Renderer ─────────────────────────────────────────────────
-
-  towersAt(col: number, row: number): Tower[] {
-    return this.towerPlacement.towersAt(this.towers, col, row) as Tower[];
-  }
-
-  towerCost(typeId: string): number {
-    return this.towerPlacement.towerCost(typeId, this.towers, this.items);
-  }
-
-  towerUpgradeCost(tower?: Tower): number {
-    return this.towerPlacement.towerUpgradeCost(tower, this.items);
-  }
 
   // ─── Loop ────────────────────────────────────────────────────────────────────
 
@@ -216,22 +182,11 @@ export class Game implements IGameContext {
     if (this.rewardSystem.processEndOfPath(this)) return;
 
     this.effectSystem.update(this, dt);
-    this.bossSystem.update(this, dt);
+    this.enemyBehaviors.update(this, dt);
     this.combatSystem.update(this, dt);
     this.rewardSystem.processKills(this);
     this.animations.update(dt);
-
-    for (const f of this.floatingTexts) { f.y -= 40 * dt; f.life -= dt; }
-    this.floatingTexts = this.floatingTexts.filter(f => f.life > 0);
-
-    if (this.itemDropAnim) {
-      this.itemDropAnim.timer += dt;
-      const t = this.itemDropAnim.timer;
-      if (t < 0.6) this.itemDropAnim.phase = 'rising';
-      else if (t < 2.0) this.itemDropAnim.phase = 'showing';
-      else this.itemDropAnim.phase = 'fading';
-      if (t >= this.itemDropAnim.totalTime) this.itemDropAnim = null;
-    }
+    this.itemSystem.updateItemDropAnim(this, dt);
   }
 
   addFT(pos: Vec2, text: string, color: string) {
@@ -242,7 +197,7 @@ export class Game implements IGameContext {
   }
 
   triggerAoeFlash(x: number, y: number, radius: number) {
-    this.renderer.triggerAoe(x, y, radius);
+    this.animations.request({ id: 'aoe_flash', sourceX: x, sourceY: y, radius });
   }
 
   requestScreen(to: import('../types').GameScreen): void {
@@ -253,6 +208,12 @@ export class Game implements IGameContext {
 
   private render() {
     this.renderer.setMousePos(this.mousePos);
+
+    const wm = this.waveManager;
+    const boss = wm.isBossWave && wm.waveActive
+      ? this.enemies.find(e => e.def.isBoss && !e.dead) ?? null
+      : null;
+
     this.renderer.render({
       screen: this.screen,
       paused: this.paused,
@@ -273,15 +234,26 @@ export class Game implements IGameContext {
         items: this.items,
         itemDropAnim: this.itemDropAnim,
         canFuse: this.upgradePopup
-          ? this.towerInteraction.canFuse(this.towers, this.upgradePopup.col, this.upgradePopup.row)
+          ? this.towerService.canFuse(this.towers, this.upgradePopup.col, this.upgradePopup.row)
           : false,
+        animationInstances: this.animations.getActive(),
+        mapExpandCost: this.towerService.getMapExpandCost(this.items),
+        canExpandMap: this.currentMapTier < 3
+          && wm.betweenWaves
+          && this.gold >= this.towerService.getMapExpandCost(this.items),
+        bossBarState: boss
+          ? { active: true as const, hp: boss.hp, maxHp: boss.maxHp, ratio: boss.hp / boss.maxHp }
+          : { active: false as const },
       },
       player: this.player,
       talentTree: this.talentTree,
-      towersAt: (c, r) => this.towersAt(c, r),
-      towerCost: (id) => this.towerCost(id),
-      towerUpgradeCost: (t) => this.towerUpgradeCost(t),
+      towersAt: (c, r) => this.towerService.towersAt(this.towers, c, r) as Tower[],
+      isCellFull: (c, r) => this.towerService.isCellFull(this.towers, c, r),
+      towerCost: (id) => this.towerService.towerCost(id, this.towers, this.items),
+      towerUpgradeCost: (t) => this.towerService.towerUpgradeCost(t, this.items),
       getSynergyBonus: (t) => this.combatSystem.getSynergyBonus(t, this),
+      getMoveCost: (towers) => this.towerService.getMoveCost(towers),
+      getSellRefund: (t) => this.towerService.getSellRefund(t),
       gameSpeed: this.gameSpeed,
       debugMode: this.debugMode,
       pendingAffinity: this.pendingAffinity,
@@ -289,89 +261,10 @@ export class Game implements IGameContext {
     });
   }
 
-  // ─── Debug Commands ─────────────────────────────────────────────────────────
+  // ─── Debug ───────────────────────────────────────────────────────────────────
 
   handleDebugClick(cmd: string) {
     if (!this.debugMode) return;
-    switch (cmd) {
-      case 'gold_1000':  this.gold += 1000; break;
-      case 'gold_10000': this.gold += 10000; break;
-      case 'levelup': {
-        if (this.player.level < 50) {
-          this.player.xp = 0;
-          this.player.level++;
-          if (this.player.level % 10 === 0) this.player.talentPoints++;
-          this.screen = 'levelup';
-        }
-        break;
-      }
-      case 'levelup10': {
-        for (let i = 0; i < 10 && this.player.level < 50; i++) {
-          this.player.level++;
-          if (this.player.level % 10 === 0) this.player.talentPoints++;
-          const keys: Array<'strength'|'intelligence'|'dexterity'|'agility'|'luck'|'vitality'> =
-            ['strength','intelligence','dexterity','agility','luck','vitality'];
-          this.player.stats[keys[Math.floor(Math.random() * keys.length)]]++;
-        }
-        this.player.xp = 0;
-        break;
-      }
-      case 'maxlevel': {
-        while (this.player.level < 50) {
-          this.player.level++;
-          if (this.player.level % 10 === 0) this.player.talentPoints++;
-          const keys: Array<'strength'|'intelligence'|'dexterity'|'agility'|'luck'|'vitality'> =
-            ['strength','intelligence','dexterity','agility','luck','vitality'];
-          this.player.stats[keys[Math.floor(Math.random() * keys.length)]]++;
-        }
-        this.player.xp = 0;
-        break;
-      }
-      case 'heal':       this.lives = BASE_LIVES; break;
-      case 'kill_all': {
-        for (const e of this.enemies) {
-          if (!e.dead) {
-            e.dead = true;
-            this.waveManager.enemiesKilledThisWave++;
-            const rewardM = 1 + (this.waveManager.currentWave - 1) * GameConfig.get().economy.rewardScalePerWave;
-            const g = Math.round(e.def.reward * rewardM * this.player.goldMultiplier()) + this.itemSystem.getGoldBonus(this.items);
-            this.gold += g; this.score += g;
-          }
-        }
-        this.enemies = [];
-        break;
-      }
-      case 'skip_wave': {
-        for (const e of this.enemies) e.dead = true;
-        this.enemies = [];
-        this.waveManager.spawnQueues = [];
-        this.waveManager.waveActive = false;
-        this.waveManager.waveComplete = true;
-        this.waveManager.betweenWaves = true;
-        break;
-      }
-      case 'skip10': {
-        for (let i = 0; i < 10; i++) this.waveManager.currentWave++;
-        this.waveManager.waveActive = false;
-        this.waveManager.waveComplete = true;
-        this.waveManager.betweenWaves = true;
-        this.enemies = [];
-        break;
-      }
-      case 'give_item':  this.itemSystem.rollItemDrop(this); break;
-      case 'max_towers': {
-        for (const t of this.towers) {
-          while (!t.isMaxLevel) {
-            const stat: 'damage'|'speed' = Math.random() < 0.5 ? 'damage' : 'speed';
-            if (stat === 'damage') t.damageMult += 0.1;
-            else t.speedMult += 0.1;
-            t.upgradeCount++;
-            t.upgradeHistory.push(stat);
-          }
-        }
-        break;
-      }
-      case 'god_mode':   this.lives = 9999; break;
-    }
+    this.debugService.execute(this, cmd);
   }
 }

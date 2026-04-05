@@ -1,4 +1,4 @@
-import type { MapData } from '../../game/MapGenerator';
+import type { MapData } from '../../systems/MapGenerator';
 import type { MapSliceState } from '../GameState';
 
 /**

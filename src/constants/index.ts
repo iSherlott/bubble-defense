@@ -34,6 +34,7 @@ export const TALENT_POINT_EVERY = C.player.talentPointEvery;
 export const MIN_STAT_VALUE     = C.player.minStatValue;
 export const STARTING_STAT_TOTAL = C.player.startingStatTotal;
 
+
 // ─── Stat Labels ──────────────────────────────────────────────────────────────
 export const STAT_LABELS: Record<string, string> = {
   strength:'Força', intelligence:'Inteligência', dexterity:'Destreza',
@@ -51,19 +52,6 @@ export const STAT_ICONS: Record<string, string> = {
   strength:'⚔', intelligence:'🔮', dexterity:'🎯',
   agility:'⚡', luck:'🍀', vitality:'❤',
 };
-
-// ─── Wave Definitions ─────────────────────────────────────────────────────────
-export const WAVE_DEFS = [
-  [{ typeId:'goblin',  count:6  }],
-  [{ typeId:'goblin',  count:8  }, { typeId:'troll',  count:2 }],
-  [{ typeId:'harpy',   count:6  }, { typeId:'goblin', count:4 }],
-  [{ typeId:'troll',   count:4  }, { typeId:'harpy',  count:4 }],
-  [{ typeId:'goblin',  count:12 }, { typeId:'golem',  count:1 }],
-  [{ typeId:'golem',   count:3  }, { typeId:'harpy',  count:6 }],
-  [{ typeId:'troll',   count:6  }, { typeId:'goblin', count:8 }],
-  [{ typeId:'golem',   count:4  }, { typeId:'harpy',  count:8 }],
-  [{ typeId:'dragon',  count:1  }, { typeId:'golem',  count:3 }],
-];
 
 // ─── Content re-exports (backwards compatibility) ─────────────────────────────
 export { ELEMENT_COLORS, ELEMENT_ICONS, ELEMENT_NAMES, ELEMENT_DESCRIPTIONS, OPPOSITE_ELEMENT } from '../content/elements';

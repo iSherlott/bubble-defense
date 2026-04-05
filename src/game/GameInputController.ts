@@ -1,8 +1,8 @@
 // ─── GameInputController — mouse, keyboard, click dispatch ───────────────────
 // Extracted from Game.ts to isolate input handling from game logic.
 
-import type { Vec2, ElementType, GameScreen } from '../types';
-import type { Game, UpgradePopup } from './Game';
+import type { Vec2, ElementType, UpgradePopup } from '../types';
+import type { Game } from './Game';
 import { towerRegistry } from '../registries';
 
 export class GameInputController {
@@ -65,8 +65,8 @@ export class GameInputController {
   private onKeyDown(e: KeyboardEvent) {
     const g = this.game;
     if (e.key === 'Escape') {
-      if (g.screen === 'talent')   { g.screen = 'game'; return; }
-      if (g.screen === 'bestiary') { g.screen = 'game'; return; }
+      if (g.screen === 'talent')   { g.requestScreen('game'); return; }
+      if (g.screen === 'bestiary') { g.requestScreen('game'); return; }
       if (g.screen === 'game') {
         if (g.movingTower)  { g.movingTower = null; return; }
         if (g.upgradePopup) { g.upgradePopup = null; return; }
@@ -84,7 +84,7 @@ export class GameInputController {
   private handleMenuClick(p: Vec2) {
     const g = this.game;
     const b = g.renderer.getMenuButtonRects();
-    if (b['newGame']  && this.hit(p, b['newGame']))  g.screen = 'affinity';
+    if (b['newGame']  && this.hit(p, b['newGame']))  g.requestScreen('affinity');
     if (b['loadGame'] && this.hit(p, b['loadGame']) && g.hasSaveAvailable()) g.loadGameFromSave();
   }
 
@@ -93,7 +93,7 @@ export class GameInputController {
     for (const [el, r] of g.renderer.getAffinityRects()) {
       if (this.hit(p, r)) {
         g.pendingAffinity = el as ElementType;
-        g.screen = 'archetype' as GameScreen;
+        g.requestScreen('archetype');
         return;
       }
     }
@@ -109,7 +109,7 @@ export class GameInputController {
       }
     }
     const back = g.renderer.getArchetypeBackRect();
-    if (back && this.hit(p, back)) { g.screen = 'affinity'; return; }
+    if (back && this.hit(p, back)) { g.requestScreen('affinity'); return; }
   }
 
   private handleBonusClick(p: Vec2) {
@@ -131,7 +131,7 @@ export class GameInputController {
     }
     const backBtn = g.renderer.getBonusBackBtn();
     if (backBtn && this.hit(p, backBtn)) {
-      g.screen = 'archetype' as GameScreen;
+      g.requestScreen('archetype');
       return;
     }
   }
@@ -139,8 +139,8 @@ export class GameInputController {
   private handleGameOverClick(p: Vec2) {
     const g = this.game;
     const b = g.renderer.getGameOverButtonRects();
-    if (b['menu']    && this.hit(p, b['menu']))    g.screen = 'menu';
-    if (b['restart'] && this.hit(p, b['restart'])) g.screen = 'affinity';
+    if (b['menu']    && this.hit(p, b['menu']))    g.requestScreen('menu');
+    if (b['restart'] && this.hit(p, b['restart'])) g.requestScreen('affinity');
   }
 
   private handleLevelUpClick(p: Vec2) {
@@ -148,21 +148,21 @@ export class GameInputController {
     const keys = ['strength','intelligence','dexterity','agility','luck','vitality'] as const;
     for (const k of keys) {
       const r = g.renderer.getLevelUpButtonRects()[k];
-      if (r && this.hit(p, r)) { g.player.chooseStat(k); g.screen = 'game'; return; }
+      if (r && this.hit(p, r)) { g.player.chooseStat(k); g.requestScreen('game'); return; }
     }
   }
 
   private handleBestiaryClick(p: Vec2) {
     const g = this.game;
     const b = g.renderer.getBestiaryRects();
-    if (b['back'] && this.hit(p, b['back'])) { g.screen = 'game'; return; }
+    if (b['back'] && this.hit(p, b['back'])) { g.requestScreen('game'); return; }
     g.renderer.handleBestiaryTabClick(p, this.hit.bind(this));
   }
 
   private handleTalentClick(p: Vec2) {
     const g = this.game;
     const back = g.renderer.getTalentBackRect();
-    if (back && this.hit(p, back)) { g.screen = 'game'; return; }
+    if (back && this.hit(p, back)) { g.requestScreen('game'); return; }
     for (const [id, r] of g.renderer.getTalentRects()) {
       if (this.hit(p, r)) {
         const node = g.talentTree.nodes.get(id);
@@ -204,9 +204,9 @@ export class GameInputController {
     }
     if (ui['autoWave']    && this.hit(p, ui['autoWave']))    { g.autoWave = !g.autoWave; return; }
     if (ui['speedToggle'] && this.hit(p, ui['speedToggle'])) { g.gameSpeed = g.gameSpeed === 1 ? 2 : 1; return; }
-    if (ui['talentBtn']   && this.hit(p, ui['talentBtn']))   { g.screen = 'talent'; return; }
+    if (ui['talentBtn']   && this.hit(p, ui['talentBtn']))   { g.requestScreen('talent'); return; }
     if (ui['expandMap']   && this.hit(p, ui['expandMap']))   { g.expandMap(); return; }
-    if (ui['bestiary']    && this.hit(p, ui['bestiary']))    { g.screen = 'bestiary'; return; }
+    if (ui['bestiary']    && this.hit(p, ui['bestiary']))    { g.requestScreen('bestiary'); return; }
     for (const [id, r] of g.renderer.getTowerSelectionRects()) {
       if (this.hit(p, r)) {
         g.selectedTowerType = g.selectedTowerType === id ? '' : id;
@@ -220,16 +220,16 @@ export class GameInputController {
 
       // Move mode
       if (g.movingTower) {
-        g.towerPlacement.moveTower(g, g.movingTower, cell.x, cell.y);
+        g.towerService.moveTower(g, g.movingTower, cell.x, cell.y);
         g.movingTower = null;
         return;
       }
 
-      const here = g.towerPlacement.towersAt(g.towers, cell.x, cell.y);
+      const here = g.towerService.towersAt(g.towers, cell.x, cell.y);
       if (here.length > 0) {
         g.upgradePopup = { col: cell.x, row: cell.y };
       } else if (g.selectedTowerType) {
-        g.towerPlacement.placeTower(g, g.selectedTowerType, cell.x, cell.y, 0);
+        g.towerService.placeTower(g, g.selectedTowerType, cell.x, cell.y, 0);
         g.selectedTowerType = '';
       }
     }
@@ -244,26 +244,21 @@ export class GameInputController {
     for (let i = 0; i < 2; i++) {
       const k = `upgrade_${i}`;
       if (btns[k] && this.hit(p, btns[k])) {
-        const here = g.towerPlacement.towersAt(g.towers, popup.col, popup.row);
+        const here = g.towerService.towersAt(g.towers, popup.col, popup.row);
         if (here[i]) {
-          const upgCost = g.towerPlacement.towerUpgradeCost(here[i], g.items);
-          if (g.gold >= upgCost && !here[i].isMaxLevel) {
-            g.gold -= upgCost;
-            here[i].goldSpent += upgCost;
-            g.towerInteraction.upgradeTower(g, here[i]);
-          }
+          g.towerService.upgradeTower(g, here[i]);
         }
         return;
       }
       const sk = `sell_${i}`;
       if (btns[sk] && this.hit(p, btns[sk])) {
-        const here = g.towerPlacement.towersAt(g.towers, popup.col, popup.row);
-        if (here[i]) { g.towerPlacement.sellTower(g, here[i]); }
+        const here = g.towerService.towersAt(g.towers, popup.col, popup.row);
+        if (here[i]) { g.towerService.sellTower(g, here[i]); }
         g.upgradePopup = null; return;
       }
       const mk = `move_${i}`;
       if (btns[mk] && this.hit(p, btns[mk])) {
-        const here = g.towerPlacement.towersAt(g.towers, popup.col, popup.row);
+        const here = g.towerService.towersAt(g.towers, popup.col, popup.row);
         if (here[i]) { g.movingTower = here[i]; }
         g.upgradePopup = null; return;
       }
@@ -273,14 +268,14 @@ export class GameInputController {
     for (const def of towerRegistry.getAllDefs()) {
       const k = `addSecond_${def.id}`;
       if (btns[k] && this.hit(p, btns[k])) {
-        g.towerPlacement.placeSecondTower(g, def.id, popup.col, popup.row);
+        g.towerService.placeTower(g, def.id, popup.col, popup.row, 1);
         g.upgradePopup = null; return;
       }
     }
 
     // Fusion button
     if (btns['fusion'] && this.hit(p, btns['fusion'])) {
-      g.towerInteraction.fuseTowers(g, popup.col, popup.row);
+      g.towerService.fuseTowers(g, popup.col, popup.row);
       g.upgradePopup = null; return;
     }
 
@@ -296,7 +291,7 @@ export class GameInputController {
       }
     }
     const cell = this.px2grid(p);
-    const here = g.towerPlacement.towersAt(g.towers, cell.x, cell.y);
+    const here = g.towerService.towersAt(g.towers, cell.x, cell.y);
     if (here.length > 0) g.modal.showTower(here[0], g.player.stats, g.talentTree);
   }
 }

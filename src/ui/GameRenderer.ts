@@ -1,10 +1,10 @@
-import type { Vec2, ElementType, OwnedItem, ItemDropAnim } from '../types';
+import type { Vec2, ElementType, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
+import type { AnimationInstance } from '../types/animation';
 import type { BaseTower as Tower } from '../entities/BaseTower';
 import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
 import type { Player } from '../player/Player';
-import type { WaveManager } from '../game/WaveManager';
-import type { UpgradePopup } from '../game/Game';
-import type { MapData } from '../game/MapGenerator';
+import type { WaveManager } from '../systems/WaveManager';
+import type { MapData } from '../systems/MapGenerator';
 import type { EntityRenderer } from './EntityRenderer';
 
 import { BoardRenderer } from './game/BoardRenderer';
@@ -34,12 +34,19 @@ export interface GameRenderState {
     items: OwnedItem[];
     itemDropAnim: ItemDropAnim | null;
     canFuse: boolean;
+    animationInstances: ReadonlyArray<AnimationInstance>;
+    mapExpandCost: number;
+    canExpandMap: boolean;
+    bossBarState: { active: false } | { active: true; hp: number; maxHp: number; ratio: number };
   };
   player: Player;
   towersAt: (c: number, r: number) => Tower[];
+  isCellFull: (c: number, r: number) => boolean;
   towerCost: (id: string) => number;
   towerUpgradeCost: (t?: Tower) => number;
   getSynergyBonus: (t: Tower) => number;
+  getMoveCost: (towers: Tower[]) => number;
+  getSellRefund: (t: Tower) => number;
   gameSpeed: 1 | 2;
   debugMode: boolean;
   mousePos: Vec2;
@@ -52,10 +59,6 @@ export class GameRenderer {
   private itemsHud: ItemsHudRenderer;
   private upgradePopup: UpgradePopupRenderer;
   private debugPanel: DebugPanelRenderer;
-
-  // Expose aoeFlashes so Renderer.ts can tick them
-  get aoeFlashes() { return this.board.aoeFlashes; }
-  set aoeFlashes(v) { this.board.aoeFlashes = v; }
 
   constructor(private entityRenderer: EntityRenderer) {
     this.board        = new BoardRenderer();
@@ -73,20 +76,20 @@ export class GameRenderer {
   getUpgradePopupRect()    { return this.upgradePopup.getUpgradePopupRect(); }
   getDebugBtns()           { return this.debugPanel.getDebugBtns(); }
 
-  triggerAoe(x: number, y: number, r: number) { this.board.triggerAoe(x, y, r); }
-
   renderGame(ctx: CanvasRenderingContext2D, map: MapData, gw: number, gh: number, state: GameRenderState) {
     const g = state.game;
 
     this.board.render(ctx, map, gw, gh, state, this.entityRenderer);
     this.sidebar.render(ctx, gw, gh, state);
     this.itemsHud.render(ctx, gw, g.items, { x: 0, y: 0 });
-    this.waveBar.render(ctx, gw, gh, g.waveManager, g.enemies);
+    this.waveBar.render(ctx, gw, gh, g.waveManager, g.bossBarState);
+
 
     if (g.upgradePopup)
       this.upgradePopup.render(
         ctx, gw, gh, g.upgradePopup,
         state.towersAt, state.towerCost, state.towerUpgradeCost, state.getSynergyBonus,
+        state.getMoveCost, state.getSellRefund,
         g.gold, g.canFuse,
       );
 

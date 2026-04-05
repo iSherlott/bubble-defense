@@ -80,7 +80,7 @@ export const BOSS_DEFS: EnemyDef[] = [
     immune: 'earth', halfElements: ['fire', 'wind'],
     color: '#228822', size: 34, baseLivesLost: 5, reward: 150, xp: 50,
     description: 'Invoca goblins a cada 25% de HP perdido.', isBoss: true,
-    bossAbility: 'summon_adds',
+    behaviorIds: ['summon_adds'],
   },
   {
     id: 'boss_chaos_dragon', name: 'Dragão Caótico',
@@ -88,7 +88,7 @@ export const BOSS_DEFS: EnemyDef[] = [
     immune: 'fire', halfElements: ['wind', 'earth'],
     color: '#cc2200', size: 42, baseLivesLost: 5, reward: 250, xp: 80,
     description: 'Deixa rastro de fogo que queima torres próximas.', isBoss: true,
-    bossAbility: 'fire_trail',
+    behaviorIds: ['fire_trail'],
   },
   {
     id: 'boss_shadow_titan', name: 'Titã das Sombras',
@@ -96,6 +96,6 @@ export const BOSS_DEFS: EnemyDef[] = [
     immune: 'water', halfElements: ['earth', 'fire'],
     color: '#330055', size: 50, baseLivesLost: 5, reward: 400, xp: 120,
     description: 'Fica imune por 3s ao chegar a 50% HP.', isBoss: true,
-    bossAbility: 'shield_phase',
+    behaviorIds: ['shield_phase'],
   },
 ];

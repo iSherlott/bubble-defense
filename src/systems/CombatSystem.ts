@@ -2,7 +2,7 @@ import type { IGameContext } from '../core/GameContext';
 import type { BaseTower } from '../entities/BaseTower';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { ProjectileData, ElementType } from '../types';
-import { createProjectile, updateProjectile } from '../entities/Projectile';
+import { createProjectile, updateProjectile } from '../factories/ProjectileFactory';
 import { CELL_SIZE, ELEMENT_COLORS } from '../constants';
 import { GameConfig } from '../config';
 import { towerRegistry } from '../registries';
@@ -22,6 +22,18 @@ const WIND_PUSH_PX   = cfg.combat.windPushCells * CELL_SIZE;
  */
 export class CombatSystem {
   constructor(private itemSystem: ItemSystem) {}
+
+  /** Combined hunter + boss item multiplier for a target. */
+  private itemDamageMult(target: BaseEnemy, items: import('../types').OwnedItem[]): number {
+    return this.itemSystem.getHunterMult(target, items) * this.itemSystem.getBossMult(target, items);
+  }
+
+  /** Apply fire AoE splash if the player has the item, returning early otherwise. */
+  private tryFireSplash(ctx: IGameContext, source: BaseEnemy, baseDmg: number): void {
+    if (!this.itemSystem.hasEffect('fire_aoe_splash', ctx.items)) return;
+    const mult = this.itemSystem.getEffectValue('fire_aoe_splash_mult', ctx.items);
+    this.applyFireAoeSplash(ctx, source, baseDmg * mult);
+  }
 
   update(ctx: IGameContext, dt: number): void {
     const extraProjs: ProjectileData[] = [];
@@ -94,6 +106,17 @@ export class CombatSystem {
     // Normal magic → delegate to element behavior from registry
     const blueprint = towerRegistry.get(tower.def.id);
     blueprint.magicBehavior.cast(ctx, tower, affM, extra);
+
+    // Data-driven animation: trigger the tower's magic animation if defined
+    if (tower.def.magicAnimationId) {
+      ctx.animations.request({
+        id: tower.def.magicAnimationId,
+        sourceX: tower.pixelX,
+        sourceY: tower.pixelY,
+        radius: tower.getRange(),
+        color: tower.def.accentColor,
+      });
+    }
   }
 
   private fireFusionMagic(ctx: IGameContext, tower: BaseTower, affM: number, extra: ProjectileData[]): void {
@@ -139,10 +162,7 @@ export class CombatSystem {
     const shield = this.findEarthGolemShield(ctx, enemy);
     const actualTarget = shield ?? enemy;
     const tw = ctx.towers.find(t => t.id === proj.towerId);
-
-    const hunterMult = this.itemSystem.getHunterMult(actualTarget, ctx.items);
-    const bossMult   = this.itemSystem.getBossMult(actualTarget, ctx.items);
-    const itemMult   = hunterMult * bossMult;
+    const itemMult = this.itemDamageMult(actualTarget, ctx.items);
 
     if (proj.components && proj.components.length > 0) {
       let totalDealt = 0;
@@ -157,11 +177,7 @@ export class CombatSystem {
       if (shield) ctx.addFT(shield.pos, `🛡${label}`, '#aaaaff');
       else ctx.addFT(enemy.pos, proj.isCrit ? `${label} CRÍTICO!` : label,
         proj.isCrit ? '#ffff44' : proj.color);
-      // Fire AoE splash
-      if (this.itemSystem.hasEffect('fire_aoe_splash', ctx.items) && proj.components.some(c => c.element === 'fire')) {
-        const splashMult = this.itemSystem.getEffectValue('fire_aoe_splash_mult', ctx.items);
-        this.applyFireAoeSplash(ctx, actualTarget, totalDealt * splashMult);
-      }
+      if (proj.components.some(c => c.element === 'fire')) this.tryFireSplash(ctx, actualTarget, totalDealt);
     } else {
       const dmg = actualTarget.receiveDamage(proj.damage * itemMult, proj.element);
       if (tw) { tw.totalDamageDealt += dmg; if (actualTarget.dead) tw.totalKills++; }
@@ -173,10 +189,7 @@ export class CombatSystem {
         ctx.addFT(enemy.pos, proj.isCrit ? `${Math.round(dmg)} CRÍTICO!` : String(Math.round(dmg)),
           proj.isCrit ? '#ffff44' : proj.color);
       }
-      if (this.itemSystem.hasEffect('fire_aoe_splash', ctx.items) && proj.element === 'fire') {
-        const splashMult = this.itemSystem.getEffectValue('fire_aoe_splash_mult', ctx.items);
-        this.applyFireAoeSplash(ctx, actualTarget, dmg * splashMult);
-      }
+      if (proj.element === 'fire') this.tryFireSplash(ctx, actualTarget, dmg);
     }
   }
 
@@ -199,7 +212,7 @@ export class CombatSystem {
 
     // Multi-element magic
     if (proj.components && proj.components.length > 0) {
-      const itemMult = this.itemSystem.getHunterMult(target, items) * this.itemSystem.getBossMult(target, items);
+      const itemMult = this.itemDamageMult(target, items);
       let totalDealt = 0;
       const parts: string[] = [];
       for (const comp of proj.components) {
@@ -216,9 +229,7 @@ export class CombatSystem {
     }
 
     // Single-element magic
-    const hunterMult = this.itemSystem.getHunterMult(target, items);
-    const bossMult   = this.itemSystem.getBossMult(target, items);
-    const itemMult   = hunterMult * bossMult;
+    const itemMult = this.itemDamageMult(target, items);
     const c = ELEMENT_COLORS[proj.element];
 
     switch (proj.element) {
@@ -231,9 +242,7 @@ export class CombatSystem {
         if (this.itemSystem.hasEffect('fire_magma_trail', items)) {
           ctx.burnZones.push({ x: target.pos.x, y: target.pos.y, radius: 50, remaining: 4, dmgPerSec: proj.damage * 0.20 });
         }
-        if (this.itemSystem.hasEffect('fire_aoe_splash', items)) {
-          this.applyFireAoeSplash(ctx, target, d * this.itemSystem.getEffectValue('fire_aoe_splash_mult', items));
-        }
+        this.tryFireSplash(ctx, target, d);
         break;
       }
       case 'water': {
@@ -257,7 +266,7 @@ export class CombatSystem {
         const aoeR = EARTH_AOE_BASE * ctx.talentTree.earthAoERadiusMult() * (1 + this.itemSystem.getEarthRadiusBonus(items));
         const targets = ctx.enemies.filter(e => !e.dead && Math.hypot(e.pos.x - target.pos.x, e.pos.y - target.pos.y) <= aoeR);
         for (const t of targets) {
-          const tMult = this.itemSystem.getHunterMult(t, items) * this.itemSystem.getBossMult(t, items);
+          const tMult = this.itemDamageMult(t, items);
           const d = t.receiveDamage(proj.damage * tMult, 'earth');
           if (tw) { tw.totalDamageDealt += d; if (t.dead) tw.totalKills++; }
           ctx.addFT(t.pos, `🌍${Math.round(d)}`, c);
@@ -279,7 +288,7 @@ export class CombatSystem {
         const windStunDur = ctx.talentTree.windStunDuration() * this.itemSystem.getWindStunMult(items);
 
         for (const wt of windTargets) {
-          const wtMult = this.itemSystem.getHunterMult(wt, items) * this.itemSystem.getBossMult(wt, items);
+          const wtMult = this.itemDamageMult(wt, items);
           const d = wt.receiveDamage(proj.damage * windDmgMult * wtMult, 'wind');
           if (tw) { tw.totalDamageDealt += d; if (wt.dead) tw.totalKills++; }
           if (wt.def.golemType !== 'wind') {
@@ -305,10 +314,7 @@ export class CombatSystem {
     if (elements.includes('fire') && this.itemSystem.hasEffect('fire_magma_trail', items)) {
       ctx.burnZones.push({ x: target.pos.x, y: target.pos.y, radius: 50, remaining: 4, dmgPerSec: proj.damage * 0.20 });
     }
-    if (elements.includes('fire') && this.itemSystem.hasEffect('fire_aoe_splash', items)) {
-      const splashMult = this.itemSystem.getEffectValue('fire_aoe_splash_mult', items);
-      this.applyFireAoeSplash(ctx, target, proj.damage * splashMult);
-    }
+    if (elements.includes('fire')) this.tryFireSplash(ctx, target, proj.damage);
     if (elements.includes('water')) {
       const slowAmp = Math.round(this.itemSystem.getWaterSlowAmp(items));
       for (let i = 0; i < slowAmp; i++) target.addPermanentSlow();

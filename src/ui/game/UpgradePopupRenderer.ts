@@ -1,11 +1,10 @@
 import type { BaseTower as Tower } from '../../entities/BaseTower';
-import type { UpgradePopup } from '../../game/Game';
+import type { UpgradePopup } from '../../types';
 import { CELL_SIZE, ELEMENT_COLORS, ELEMENT_ICONS } from '../../constants';
 import { getFusionDef } from '../../constants';
-import { GameConfig } from '../../config';
 import { towerRegistry } from '../../registries';
 import type { Rect } from '../RenderUtils';
-import { btn, rr } from '../RenderUtils';
+import { drawButton, roundedRect } from '../RenderUtils';
 
 export class UpgradePopupRenderer {
   private upgradeBtns: Record<string, Rect> = {};
@@ -23,6 +22,8 @@ export class UpgradePopupRenderer {
     towerCost: (id: string) => number,
     towerUpgradeCost: (t?: Tower) => number,
     getSynergyBonus: (t: Tower) => number,
+    getMoveCost: (towers: Tower[]) => number,
+    getSellRefund: (t: Tower) => number,
     gold: number,
     canFuse = false,
   ) {
@@ -42,8 +43,8 @@ export class UpgradePopupRenderer {
     this.upgradePopupRect = { x: px, y: py, w: pw, h: ph };
     this.upgradeBtns = {};
 
-    ctx.fillStyle = '#111128'; rr(ctx, px, py, pw, ph, 10); ctx.fill();
-    ctx.strokeStyle = '#5555aa'; ctx.lineWidth = 1.5; rr(ctx, px, py, pw, ph, 10); ctx.stroke();
+    ctx.fillStyle = '#111128'; roundedRect(ctx, px, py, pw, ph, 10); ctx.fill();
+    ctx.strokeStyle = '#5555aa'; ctx.lineWidth = 1.5; roundedRect(ctx, px, py, pw, ph, 10); ctx.stroke();
 
     ctx.textAlign = 'left';
     let ry = py + 10;
@@ -59,16 +60,16 @@ export class UpgradePopupRenderer {
     }
     ry += headerH;
 
-    const totalMoveCost = here.reduce((s, t) => s + Math.round(t.placedCost * GameConfig.get().movement.moveCostMult), 0);
+    const totalMoveCost = getMoveCost(here);
     const canMvAll = gold >= totalMoveCost;
 
     here.forEach((tower, i) => {
       const infoRect = { x: px + 8, y: ry, w: pw - 16, h: towerH - 4 };
       const maxed = tower.isMaxLevel;
       ctx.fillStyle = maxed ? '#1a1500' : '#141420';
-      rr(ctx, infoRect.x, infoRect.y, infoRect.w, infoRect.h, 6); ctx.fill();
+      roundedRect(ctx, infoRect.x, infoRect.y, infoRect.w, infoRect.h, 6); ctx.fill();
       ctx.strokeStyle = maxed ? '#aaaa00' : '#333355'; ctx.lineWidth = 1;
-      rr(ctx, infoRect.x, infoRect.y, infoRect.w, infoRect.h, 6); ctx.stroke();
+      roundedRect(ctx, infoRect.x, infoRect.y, infoRect.w, infoRect.h, 6); ctx.stroke();
 
       const ec = ELEMENT_COLORS[tower.def.element];
       const lvlBx = infoRect.x + 12, lvlBy = infoRect.y + towerH / 2 - 4;
@@ -100,7 +101,7 @@ export class UpgradePopupRenderer {
         );
       } else {
         const moveLbl = here.length > 1 ? `Mover tudo: ${totalMoveCost}g` : `Mover: ${totalMoveCost}g`;
-        ctx.fillText(`Venda: ${Math.floor(tower.goldSpent / 2)}g | ${moveLbl}`, infoRect.x + 27, infoRect.y + 39);
+        ctx.fillText(`Venda: ${getSellRefund(tower)}g | ${moveLbl}`, infoRect.x + 27, infoRect.y + 39);
       }
       if (tower.dualMagic) {
         ctx.fillStyle = '#ffff44'; ctx.font = 'bold 7px Segoe UI';
@@ -115,10 +116,10 @@ export class UpgradePopupRenderer {
 
       const upgCost = towerUpgradeCost(tower);
       const canUp = !maxed && gold >= upgCost;
-      btn(ctx, upRect, maxed ? '★ Máx' : `⬆ ${upgCost}g`, canUp ? '#0d1f0d' : '#1a1a1a', canUp ? '#55bb55' : '#445544');
+      drawButton(ctx, upRect, maxed ? '★ Máx' : `⬆ ${upgCost}g`, canUp ? '#0d1f0d' : '#1a1a1a', canUp ? '#55bb55' : '#445544');
       const mvLabel = here.length > 1 ? `📦 ${totalMoveCost}g*` : `📦 ${totalMoveCost}g`;
-      btn(ctx, mvRect, mvLabel, canMvAll ? '#0d1522' : '#1a1a1a', canMvAll ? '#4499cc' : '#335577');
-      btn(ctx, slRect, `🏷 ${Math.floor(tower.goldSpent / 2)}g`, '#220f0f', '#cc5533');
+      drawButton(ctx, mvRect, mvLabel, canMvAll ? '#0d1522' : '#1a1a1a', canMvAll ? '#4499cc' : '#335577');
+      drawButton(ctx, slRect, `🏷 ${getSellRefund(tower)}g`, '#220f0f', '#cc5533');
 
       this.upgradeBtns[`upgrade_${i}`] = upRect;
       this.upgradeBtns[`move_${i}`] = mvRect;
@@ -136,9 +137,9 @@ export class UpgradePopupRenderer {
         const af = gold >= cost;
         const bx = px + 8 + (idx % 2) * (bw2 + 4), by = ry + Math.floor(idx / 2) * (bh2 + 4);
         const r2 = { x: bx, y: by, w: bw2, h: bh2 };
-        ctx.fillStyle = af ? '#12122a' : '#0e0e1e'; rr(ctx, r2.x, r2.y, r2.w, r2.h, 5); ctx.fill();
+        ctx.fillStyle = af ? '#12122a' : '#0e0e1e'; roundedRect(ctx, r2.x, r2.y, r2.w, r2.h, 5); ctx.fill();
         ctx.strokeStyle = af ? ELEMENT_COLORS[def.element] + '88' : '#333344'; ctx.lineWidth = 1;
-        rr(ctx, r2.x, r2.y, r2.w, r2.h, 5); ctx.stroke();
+        roundedRect(ctx, r2.x, r2.y, r2.w, r2.h, 5); ctx.stroke();
         ctx.fillStyle = af ? ELEMENT_COLORS[def.element] : '#554444'; ctx.font = '9px Segoe UI';
         ctx.textAlign = 'center';
         ctx.fillText(`${ELEMENT_ICONS[def.element]} ${def.name} (${cost}g)`, r2.x + bw2 / 2, r2.y + 14);
@@ -156,10 +157,10 @@ export class UpgradePopupRenderer {
         if (fusion) {
           const fusRect = { x: px + 8, y: ry, w: pw - 16, h: 30 };
           ctx.shadowColor = fusion.color; ctx.shadowBlur = 12;
-          ctx.fillStyle = '#1a0a2a'; rr(ctx, fusRect.x, fusRect.y, fusRect.w, fusRect.h, 8); ctx.fill();
+          ctx.fillStyle = '#1a0a2a'; roundedRect(ctx, fusRect.x, fusRect.y, fusRect.w, fusRect.h, 8); ctx.fill();
           ctx.shadowBlur = 0;
           ctx.strokeStyle = fusion.color; ctx.lineWidth = 2;
-          rr(ctx, fusRect.x, fusRect.y, fusRect.w, fusRect.h, 8); ctx.stroke();
+          roundedRect(ctx, fusRect.x, fusRect.y, fusRect.w, fusRect.h, 8); ctx.stroke();
           ctx.lineWidth = 1;
           ctx.fillStyle = fusion.color; ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center';
           ctx.fillText(`${fusion.icon} FUSÃO: ${fusion.name}`, fusRect.x + fusRect.w / 2, fusRect.y + 14);
@@ -173,7 +174,7 @@ export class UpgradePopupRenderer {
     }
 
     const closeRect = { x: px + 8, y: ry + 4, w: pw - 16, h: closeH - 6 };
-    btn(ctx, closeRect, '✕ Fechar', '#220000', '#aa4444');
+    drawButton(ctx, closeRect, '✕ Fechar', '#220000', '#aa4444');
     this.upgradeBtns['close'] = closeRect;
     ctx.textAlign = 'center';
   }

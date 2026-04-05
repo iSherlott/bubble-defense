@@ -1,11 +1,11 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim } from '../types';
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
+import type { AnimationInstance } from '../types/animation';
 import type { BaseTower as Tower } from '../entities/BaseTower';
 import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
 import type { Player } from '../player/Player';
 import type { SkillTree as TalentTree } from '../player/SkillTree';
-import type { WaveManager } from '../game/WaveManager';
-import type { UpgradePopup } from '../game/Game';
-import type { MapData } from '../game/MapGenerator';
+import type { WaveManager } from '../systems/WaveManager';
+import type { MapData } from '../systems/MapGenerator';
 import { SIDEBAR_W, WAVE_BAR_H } from '../constants';
 import { MenuRenderer } from './MenuRenderer';
 import { EntityRenderer } from './EntityRenderer';
@@ -32,13 +32,20 @@ interface RenderState {
     items: OwnedItem[];
     itemDropAnim: ItemDropAnim|null;
     canFuse: boolean;
+    animationInstances: ReadonlyArray<AnimationInstance>;
+    mapExpandCost: number;
+    canExpandMap: boolean;
+    bossBarState: { active: false } | { active: true; hp: number; maxHp: number; ratio: number };
   };
   player: Player;
   talentTree: TalentTree;
   towersAt: (c:number,r:number) => Tower[];
+  isCellFull: (c:number,r:number) => boolean;
   towerCost: (id:string) => number;
   towerUpgradeCost: (t?:Tower) => number;
   getSynergyBonus: (t:Tower) => number;
+  getMoveCost: (towers: Tower[]) => number;
+  getSellRefund: (t:Tower) => number;
   gameSpeed: 1 | 2;
   debugMode: boolean;
   pendingAffinity: ElementType;
@@ -79,14 +86,9 @@ export class Renderer {
   private get gw() { return this.map.gameWidth; }
   private get gh() { return this.map.gameHeight; }
 
-  triggerAoe(x: number, y: number, r: number) { this.gameR.triggerAoe(x, y, r); }
-
   setMousePos(pos: {x:number;y:number}) { this.overlay.setMousePos(pos); }
 
   render(state: RenderState) {
-    // Update AoE flashes
-    for (const f of this.gameR.aoeFlashes) f.life -= 0.016;
-    this.gameR.aoeFlashes = this.gameR.aoeFlashes.filter(f => f.life > 0);
     this.ctx.clearRect(0, 0, this.cw, this.ch);
 
     switch (state.screen) {

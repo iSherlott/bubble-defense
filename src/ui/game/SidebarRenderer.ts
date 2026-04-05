@@ -7,7 +7,7 @@ import {
 } from '../../constants';
 import { towerRegistry, itemRegistry } from '../../registries';
 import type { Rect } from '../RenderUtils';
-import { btn, rr } from '../RenderUtils';
+import { drawButton, roundedRect } from '../RenderUtils';
 
 export class SidebarRenderer {
   private gameUIBtns: Record<string, Rect> = {};
@@ -29,9 +29,9 @@ export class SidebarRenderer {
     // Affinity + tier banner
     const aff = p.affinity;
     ctx.fillStyle = ELEMENT_COLORS[aff] + '28';
-    rr(ctx, sx + 8, y, sw - 16, 22, 6); ctx.fill();
+    roundedRect(ctx, sx + 8, y, sw - 16, 22, 6); ctx.fill();
     ctx.strokeStyle = ELEMENT_COLORS[aff] + '88'; ctx.lineWidth = 1;
-    rr(ctx, sx + 8, y, sw - 16, 22, 6); ctx.stroke();
+    roundedRect(ctx, sx + 8, y, sw - 16, 22, 6); ctx.stroke();
     ctx.fillStyle = ELEMENT_COLORS[aff]; ctx.font = 'bold 10px Segoe UI';
     ctx.fillText(
       `${ELEMENT_ICONS[aff]} Aptidão: ${ELEMENT_NAMES[aff]} (2×)  |  Tier: ${state.game.currentMapTier + 1}`,
@@ -94,7 +94,7 @@ export class SidebarRenderer {
         label = '⚡  Próxima Onda'; bg = '#1a2a1a'; fg = '#55cc55';
       }
       const mainRect = { x: sx + 10, y, w: bw, h: 32 };
-      btn(ctx, mainRect, label, bg, fg);
+      drawButton(ctx, mainRect, label, bg, fg);
       this.gameUIBtns['mainAction'] = mainRect; y += 38;
 
       const indY = y;
@@ -102,7 +102,7 @@ export class SidebarRenderer {
       const colW = Math.floor((bw - 8) / 3);
 
       const autoRect = { x: sx + 10, y: indY, w: colW, h: 22 };
-      btn(ctx, autoRect,
+      drawButton(ctx, autoRect,
         state.autoWave ? '🔄 Auto: ON' : '🔄 Auto: OFF',
         state.autoWave ? '#1a2a0a' : '#1c1c1c',
         state.autoWave ? '#88ff44' : '#557755',
@@ -111,7 +111,7 @@ export class SidebarRenderer {
 
       const spdRect = { x: sx + 10 + colW + 4, y: indY, w: colW, h: 22 };
       const fast = state.gameSpeed === 2;
-      btn(ctx, spdRect, fast ? '⏩ 2x' : '▶ 1x', fast ? '#2a1a00' : '#1c1c1c', fast ? '#ffaa44' : '#777766');
+      drawButton(ctx, spdRect, fast ? '⏩ 2x' : '▶ 1x', fast ? '#2a1a00' : '#1c1c1c', fast ? '#ffaa44' : '#777766');
       this.gameUIBtns['speedToggle'] = spdRect;
 
       const canExpand = g.currentMapTier < 3 && wm.betweenWaves;
@@ -125,7 +125,7 @@ export class SidebarRenderer {
       const expAfford = g.gold >= expCost;
       const expRect = { x: sx + 10 + 2 * (colW + 4), y: indY, w: bw - 2 * (colW + 4), h: 22 };
       const expLabel = g.currentMapTier >= 3 ? '🗺 Max' : canExpand ? `🗺 ${expCost}g` : '🗺 ---';
-      btn(ctx, expRect, expLabel,
+      drawButton(ctx, expRect, expLabel,
         canExpand && expAfford ? '#0a1a1a' : '#141414',
         canExpand && expAfford ? '#44cccc' : '#335555',
       );
@@ -136,17 +136,17 @@ export class SidebarRenderer {
     // Talent + Bestiary buttons
     const tp = p.talentPoints;
     const talBtn = { x: sx + 10, y, w: bw, h: 28 };
-    btn(ctx, talBtn, `🌟  Talentos${tp > 0 ? ` (+${tp})` : ''}`, tp > 0 ? '#2a2a00' : '#181820', tp > 0 ? '#dddd44' : '#777788');
+    drawButton(ctx, talBtn, `🌟  Talentos${tp > 0 ? ` (+${tp})` : ''}`, tp > 0 ? '#2a2a00' : '#181820', tp > 0 ? '#dddd44' : '#777788');
     this.gameUIBtns['talentBtn'] = talBtn; y += 34;
 
     const bstRect = { x: sx + 10, y, w: bw, h: 28 };
-    btn(ctx, bstRect, '📖  Mostruário', '#0d0d22', '#8888cc');
+    drawButton(ctx, bstRect, '📖  Mostruário', '#0d0d22', '#8888cc');
     this.gameUIBtns['bestiary'] = bstRect; y += 34;
 
     // Moving tower hint
     if (g.movingTower) {
       ctx.fillStyle = 'rgba(100,200,255,0.15)';
-      rr(ctx, sx + 4, y, sw - 8, 22, 6); ctx.fill();
+      roundedRect(ctx, sx + 4, y, sw - 8, 22, 6); ctx.fill();
       ctx.fillStyle = '#88ddff'; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'center';
       ctx.fillText('📦 Clique no destino para mover  (ESC=cancelar)', sx + sw / 2, y + 15);
       ctx.textAlign = 'left'; y += 28;
@@ -165,9 +165,9 @@ export class SidebarRenderer {
       const rect = { x: sx + 4, y, w: sw - 8, h: 48 };
       const sel = g.selectedTowerType === def.id, afford = g.gold >= cost;
       ctx.fillStyle = sel ? '#141428' : '#0e0e1e';
-      rr(ctx, rect.x, rect.y, rect.w, rect.h, 6); ctx.fill();
+      roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 6); ctx.fill();
       ctx.strokeStyle = sel ? '#6666ff' : afford ? '#222244' : '#3a2020';
-      ctx.lineWidth = sel ? 2 : 1; rr(ctx, rect.x, rect.y, rect.w, rect.h, 6); ctx.stroke();
+      ctx.lineWidth = sel ? 2 : 1; roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 6); ctx.stroke();
 
       const ec = ELEMENT_COLORS[def.element];
       ctx.fillStyle = def.color;

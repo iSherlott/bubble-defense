@@ -11,121 +11,103 @@ export class ItemSystem {
 
   // ─── Bonus Aggregation ──────────────────────────────────────────────────────
 
-  getDmgBonus(element: ElementType, items: OwnedItem[]): number {
-    let bonus = 0;
+  /** Sum an element-typed bonus across all owned items. */
+  private sumElementBonus(
+    items: OwnedItem[],
+    hook: (effect: import('../behaviors/types').ItemEffect) => ((element: ElementType, stacks: number) => number) | undefined,
+    element: ElementType,
+  ): number {
+    let total = 0;
     for (const owned of items) {
       const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyDamage) bonus += effect.modifyDamage(element, owned.stacks);
+      if (!effect) continue;
+      const fn = hook(effect);
+      if (fn) total += fn.call(effect, element, owned.stacks);
     }
-    return bonus;
+    return total;
+  }
+
+  /** Sum a scalar bonus across all owned items. */
+  private sumScalarBonus(
+    items: OwnedItem[],
+    hook: (effect: import('../behaviors/types').ItemEffect) => ((stacks: number) => number) | undefined,
+  ): number {
+    let total = 0;
+    for (const owned of items) {
+      const effect = itemRegistry.getEffect(owned.defId);
+      if (!effect) continue;
+      const fn = hook(effect);
+      if (fn) total += fn.call(effect, owned.stacks);
+    }
+    return total;
+  }
+
+  /** Multiply an enemy-typed bonus across all owned items. */
+  private multiplyEnemyBonus(
+    items: OwnedItem[],
+    hook: (effect: import('../behaviors/types').ItemEffect) => ((enemy: BaseEnemy, stacks: number) => number) | undefined,
+    enemy: BaseEnemy,
+  ): number {
+    let mult = 1;
+    for (const owned of items) {
+      const effect = itemRegistry.getEffect(owned.defId);
+      if (!effect) continue;
+      const fn = hook(effect);
+      if (fn) mult *= fn.call(effect, enemy, owned.stacks);
+    }
+    return mult;
+  }
+
+  getDmgBonus(element: ElementType, items: OwnedItem[]): number {
+    return this.sumElementBonus(items, e => e.modifyDamage, element);
   }
 
   getSpeedBonus(element: ElementType, items: OwnedItem[]): number {
-    let bonus = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifySpeed) bonus += effect.modifySpeed(element, owned.stacks);
-    }
-    return bonus;
+    return this.sumElementBonus(items, e => e.modifySpeed, element);
   }
 
   getRangeMult(element: ElementType, items: OwnedItem[]): number {
-    let bonus = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyRange) bonus += effect.modifyRange(element, owned.stacks);
-    }
-    return 1 + bonus;
+    return 1 + this.sumElementBonus(items, e => e.modifyRange, element);
   }
 
   getMagicChargeBonus(element: ElementType, items: OwnedItem[]): number {
-    let bonus = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyMagicCharge) bonus += effect.modifyMagicCharge(element, owned.stacks);
-    }
-    return bonus;
+    return this.sumElementBonus(items, e => e.modifyMagicCharge, element);
   }
 
   getGoldBonus(items: OwnedItem[]): number {
-    let bonus = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyGoldPerKill) bonus += effect.modifyGoldPerKill(owned.stacks);
-    }
-    return Math.round(bonus);
+    return Math.round(this.sumScalarBonus(items, e => e.modifyGoldPerKill));
   }
 
   getDiscount(items: OwnedItem[]): number {
-    let disc = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyCost) disc += effect.modifyCost(owned.stacks);
-    }
-    return Math.min(0.6, disc);
+    return Math.min(0.6, this.sumScalarBonus(items, e => e.modifyCost));
   }
 
   getSlowAura(items: OwnedItem[]): number {
-    let slow = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifySlowAura) slow += effect.modifySlowAura(owned.stacks);
-    }
-    return slow;
+    return this.sumScalarBonus(items, e => e.modifySlowAura);
   }
 
   getWindPushBonus(items: OwnedItem[]): number {
-    let bonus = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyWindPush) bonus += effect.modifyWindPush(owned.stacks);
-    }
-    return bonus;
+    return this.sumScalarBonus(items, e => e.modifyWindPush);
   }
 
   getWindStunMult(items: OwnedItem[]): number {
-    let bonus = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyWindStun) bonus += effect.modifyWindStun(owned.stacks);
-    }
-    return 1 + bonus;
+    return 1 + this.sumScalarBonus(items, e => e.modifyWindStun);
   }
 
   getWaterSlowAmp(items: OwnedItem[]): number {
-    let bonus = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyWaterSlow) bonus += effect.modifyWaterSlow(owned.stacks);
-    }
-    return 1 + bonus;
+    return 1 + this.sumScalarBonus(items, e => e.modifyWaterSlow);
   }
 
   getEarthRadiusBonus(items: OwnedItem[]): number {
-    let bonus = 0;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyEarthRadius) bonus += effect.modifyEarthRadius(owned.stacks);
-    }
-    return bonus;
+    return this.sumScalarBonus(items, e => e.modifyEarthRadius);
   }
 
   getHunterMult(enemy: BaseEnemy, items: OwnedItem[]): number {
-    let mult = 1;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyHunterDmg) mult *= effect.modifyHunterDmg(enemy, owned.stacks);
-    }
-    return mult;
+    return this.multiplyEnemyBonus(items, e => e.modifyHunterDmg, enemy);
   }
 
   getBossMult(enemy: BaseEnemy, items: OwnedItem[]): number {
-    let mult = 1;
-    for (const owned of items) {
-      const effect = itemRegistry.getEffect(owned.defId);
-      if (effect?.modifyBossDmg) mult *= effect.modifyBossDmg(enemy, owned.stacks);
-    }
-    return mult;
+    return this.multiplyEnemyBonus(items, e => e.modifyBossDmg, enemy);
   }
 
   // ─── Effect Checks ──────────────────────────────────────────────────────────
@@ -168,6 +150,19 @@ export class ItemSystem {
 
   itemStacks(id: string, items: OwnedItem[]): number {
     return items.find(i => i.defId === id)?.stacks ?? 0;
+  }
+
+  // ─── Item Drop Animation ──────────────────────────────────────────────────
+
+  /** Tick the item drop animation state machine */
+  updateItemDropAnim(ctx: IGameContext, dt: number): void {
+    if (!ctx.itemDropAnim) return;
+    ctx.itemDropAnim.timer += dt;
+    const t = ctx.itemDropAnim.timer;
+    if (t < 0.6) ctx.itemDropAnim.phase = 'rising';
+    else if (t < 2.0) ctx.itemDropAnim.phase = 'showing';
+    else ctx.itemDropAnim.phase = 'fading';
+    if (t >= ctx.itemDropAnim.totalTime) ctx.itemDropAnim = null;
   }
 
   // ─── Item Drops ─────────────────────────────────────────────────────────────

@@ -1,13 +1,13 @@
 export type Rect = { x: number; y: number; w: number; h: number };
 
-export function btn(ctx: CanvasRenderingContext2D, rect: Rect, label: string, bg: string, fg: string) {
-  ctx.fillStyle = bg; rr(ctx, rect.x, rect.y, rect.w, rect.h, 8); ctx.fill();
-  ctx.strokeStyle = fg; ctx.lineWidth = 1.5; rr(ctx, rect.x, rect.y, rect.w, rect.h, 8); ctx.stroke();
+export function drawButton(ctx: CanvasRenderingContext2D, rect: Rect, label: string, bg: string, fg: string) {
+  ctx.fillStyle = bg; roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8); ctx.fill();
+  ctx.strokeStyle = fg; ctx.lineWidth = 1.5; roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8); ctx.stroke();
   ctx.fillStyle = fg; ctx.font = 'bold 12px Segoe UI'; ctx.textAlign = 'center';
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 5);
 }
 
-export function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+export function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
   ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);

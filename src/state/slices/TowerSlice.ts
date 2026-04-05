@@ -1,5 +1,5 @@
 import type { Vec2 } from '../../types';
-import type { Tower } from '../../entities/Tower';
+import type { SingleTower as Tower } from '../../entities/towers/SingleTower';
 import type { TowerSliceState } from '../GameState';
 
 /**

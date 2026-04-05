@@ -2,7 +2,7 @@ import type { MagicBehavior } from './types';
 import type { IGameContext } from '../core/GameContext';
 import type { BaseTower } from '../entities/BaseTower';
 import type { ProjectileData } from '../types';
-import { createProjectile } from '../entities/Projectile';
+import { createProjectile } from '../factories/ProjectileFactory';
 
 // ─── Fire Magic: 3-target (first, middle, last in range) ────────────────────
 

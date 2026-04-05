@@ -1,7 +1,7 @@
-import type { Vec2, OwnedItem, ItemDropAnim, ItemDef } from '../../types';
+﻿import type { Vec2, OwnedItem, ItemDropAnim, ItemDef } from '../../types';
 import { ITEM_RARITY_COLORS, ITEM_RARITY_NAMES } from '../../constants';
 import { itemRegistry } from '../../registries';
-import { rr, wrapText } from '../RenderUtils';
+import { roundedRect, wrapText } from '../RenderUtils';
 
 export class ItemsHudRenderer {
   render(ctx: CanvasRenderingContext2D, gw: number, items: OwnedItem[], mouse: Vec2) {
@@ -11,9 +11,9 @@ export class ItemsHudRenderer {
     const hx = gw / 2 - totalW / 2, hy = 2;
 
     ctx.fillStyle = 'rgba(10,10,30,0.75)';
-    rr(ctx, hx, hy, totalW, iconSize + padding * 2, 6); ctx.fill();
+    roundedRect(ctx, hx, hy, totalW, iconSize + padding * 2, 6); ctx.fill();
     ctx.strokeStyle = '#333366'; ctx.lineWidth = 1;
-    rr(ctx, hx, hy, totalW, iconSize + padding * 2, 6); ctx.stroke();
+    roundedRect(ctx, hx, hy, totalW, iconSize + padding * 2, 6); ctx.stroke();
 
     let ix = hx + padding;
     let hoveredDef: ItemDef | null = null;
@@ -33,9 +33,9 @@ export class ItemsHudRenderer {
         : def.rarity === 'epic' ? '#1a0030'
         : def.rarity === 'rare' ? '#0a1530'
         : '#141422';
-      rr(ctx, ix, hy + padding, iconSize, iconSize, 4); ctx.fill();
+      roundedRect(ctx, ix, hy + padding, iconSize, iconSize, 4); ctx.fill();
       ctx.strokeStyle = hovered ? rc : rc + 'aa'; ctx.lineWidth = hovered ? 2 : 1;
-      rr(ctx, ix, hy + padding, iconSize, iconSize, 4); ctx.stroke();
+      roundedRect(ctx, ix, hy + padding, iconSize, iconSize, 4); ctx.stroke();
 
       ctx.font = '16px "Segoe UI Emoji", serif'; ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
@@ -59,9 +59,9 @@ export class ItemsHudRenderer {
       const ty = hy + padding + iconSize + 4;
 
       ctx.fillStyle = 'rgba(8,8,24,0.95)';
-      rr(ctx, tx, ty, tw, th, 8); ctx.fill();
+      roundedRect(ctx, tx, ty, tw, th, 8); ctx.fill();
       ctx.strokeStyle = rc; ctx.lineWidth = 1.5;
-      rr(ctx, tx, ty, tw, th, 8); ctx.stroke();
+      roundedRect(ctx, tx, ty, tw, th, 8); ctx.stroke();
 
       ctx.textAlign = 'center';
       ctx.fillStyle = rc; ctx.font = 'bold 10px Segoe UI';
@@ -91,10 +91,10 @@ export class ItemsHudRenderer {
 
       ctx.shadowColor = rc; ctx.shadowBlur = 30 + p * 20;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      rr(ctx, cx - 100, cy - 60, 200, 120, 16); ctx.fill();
+      roundedRect(ctx, cx - 100, cy - 60, 200, 120, 16); ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = rc; ctx.lineWidth = 3;
-      rr(ctx, cx - 100, cy - 60, 200, 120, 16); ctx.stroke();
+      roundedRect(ctx, cx - 100, cy - 60, 200, 120, 16); ctx.stroke();
 
       ctx.font = `${Math.round(40 * scale)}px serif`; ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
@@ -106,10 +106,10 @@ export class ItemsHudRenderer {
 
       ctx.shadowColor = rc; ctx.shadowBlur = 25 * sparkle;
       ctx.fillStyle = 'rgba(8,8,25,0.92)';
-      rr(ctx, cx - 120, cy - 80, 240, 160, 16); ctx.fill();
+      roundedRect(ctx, cx - 120, cy - 80, 240, 160, 16); ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = rc; ctx.lineWidth = 3;
-      rr(ctx, cx - 120, cy - 80, 240, 160, 16); ctx.stroke();
+      roundedRect(ctx, cx - 120, cy - 80, 240, 160, 16); ctx.stroke();
 
       ctx.fillStyle = rc; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'center';
       ctx.fillText(ITEM_RARITY_NAMES[item.rarity].toUpperCase(), cx, cy - 60);
@@ -134,9 +134,9 @@ export class ItemsHudRenderer {
       ctx.globalAlpha = p;
 
       ctx.fillStyle = 'rgba(8,8,25,0.92)';
-      rr(ctx, cx - 120, cy - 80, 240, 160, 16); ctx.fill();
+      roundedRect(ctx, cx - 120, cy - 80, 240, 160, 16); ctx.fill();
       ctx.strokeStyle = rc; ctx.lineWidth = 3;
-      rr(ctx, cx - 120, cy - 80, 240, 160, 16); ctx.stroke();
+      roundedRect(ctx, cx - 120, cy - 80, 240, 160, 16); ctx.stroke();
 
       ctx.fillStyle = rc; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'center';
       ctx.fillText(ITEM_RARITY_NAMES[item.rarity].toUpperCase(), cx, cy - 60);

@@ -3,8 +3,9 @@ import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { ProjectileData, Puddle, Vec2, OwnedItem, ItemDropAnim } from '../types';
 import type { Player } from '../player/Player';
 import type { SkillTree } from '../player/SkillTree';
-import type { WaveManager } from '../game/WaveManager';
-import type { MapData } from '../game/MapGenerator';
+import type { WaveManager } from '../systems/WaveManager';
+import type { MapData } from '../systems/MapGenerator';
+import type { AnimationSystem } from '../systems/AnimationSystem';
 
 // ─── Shared Types (moved from Game.ts) ──────────────────────────────────────
 
@@ -58,6 +59,7 @@ export interface IGameContext {
   readonly player: Player;
   readonly talentTree: SkillTree;
   readonly waveManager: WaveManager;
+  readonly animations: AnimationSystem;
 
   // Item drop animation
   itemDropAnim: ItemDropAnim | null;

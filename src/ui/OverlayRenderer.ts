@@ -6,7 +6,7 @@ import { STAT_LABELS, STAT_DESCRIPTIONS, STAT_ICONS,
   TALENT_POINT_EVERY } from '../constants';
 import { towerRegistry, enemyRegistry } from '../registries';
 import type { Rect } from './RenderUtils';
-import { btn, rr, mulberry32, wrapText, wrapTextLeft } from './RenderUtils';
+import { drawButton, roundedRect, mulberry32, wrapText, wrapTextLeft } from './RenderUtils';
 
 export class OverlayRenderer {
   private levelUpBtns: Record<string, Rect> = {};
@@ -50,8 +50,8 @@ export class OverlayRenderer {
     keys.forEach((stat, i) => {
       const col = i % cols, row = Math.floor(i / cols);
       const rect = { x: startX + col * (bw + gap), y: startY + row * (bh + gap), w: bw, h: bh };
-      ctx.fillStyle = '#0c0c22'; rr(ctx, rect.x, rect.y, rect.w, rect.h, 10); ctx.fill();
-      ctx.strokeStyle = '#4444aa'; ctx.lineWidth = 1.5; rr(ctx, rect.x, rect.y, rect.w, rect.h, 10); ctx.stroke();
+      ctx.fillStyle = '#0c0c22'; roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 10); ctx.fill();
+      ctx.strokeStyle = '#4444aa'; ctx.lineWidth = 1.5; roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 10); ctx.stroke();
       ctx.fillStyle = '#aaaaff'; ctx.font = 'bold 15px Segoe UI';
       ctx.fillText(`${STAT_ICONS[stat]} ${STAT_LABELS[stat]}`, rect.x + bw / 2, rect.y + 26);
       ctx.fillStyle = '#7777aa'; ctx.font = '12px Segoe UI';
@@ -171,7 +171,7 @@ export class OverlayRenderer {
     }
 
     const backRect = { x: 20, y: ch - 48, w: 160, h: 34 };
-    btn(ctx, backRect, '← Voltar', '#1a1a2e', '#6666aa');
+    drawButton(ctx, backRect, '← Voltar', '#1a1a2e', '#6666aa');
     this.talentBackRect = backRect;
     ctx.textAlign = 'center';
   }
@@ -193,9 +193,9 @@ export class OverlayRenderer {
     if (ty + th > ch - 8) ty = ch - th - 8;
 
     ctx.fillStyle = '#0c0c22ee';
-    rr(ctx, tx, ty, tw, th, 8); ctx.fill();
+    roundedRect(ctx, tx, ty, tw, th, 8); ctx.fill();
     ctx.strokeStyle = elColor[node.element] ?? '#aaaaff';
-    ctx.lineWidth = 1.5; rr(ctx, tx, ty, tw, th, 8); ctx.stroke();
+    ctx.lineWidth = 1.5; roundedRect(ctx, tx, ty, tw, th, 8); ctx.stroke();
 
     ctx.textAlign = 'left';
     ctx.fillStyle = elColor[node.element] ?? '#ccccff'; ctx.font = 'bold 12px Segoe UI';
@@ -228,9 +228,9 @@ export class OverlayRenderer {
       const r = { x: tx0 + i * (tw + tgap), y: 48, w: tw, h: 28 };
       const sel = this.bestiaryPage === i;
       ctx.fillStyle = sel ? '#1e1e44' : '#0e0e22';
-      rr(ctx, r.x, r.y, r.w, r.h, 6); ctx.fill();
+      roundedRect(ctx, r.x, r.y, r.w, r.h, 6); ctx.fill();
       ctx.strokeStyle = sel ? '#8888ff' : '#333355'; ctx.lineWidth = sel ? 2 : 1;
-      rr(ctx, r.x, r.y, r.w, r.h, 6); ctx.stroke();
+      roundedRect(ctx, r.x, r.y, r.w, r.h, 6); ctx.stroke();
       ctx.fillStyle = sel ? '#ddddff' : '#666688'; ctx.font = `${sel ? 'bold ' : ''}11px Segoe UI`;
       ctx.fillText(tab, r.x + tw / 2, r.y + 19);
       this.bestiaryRects[`tab_${i}`] = r;
@@ -244,8 +244,8 @@ export class OverlayRenderer {
         const col = i % cols, row = Math.floor(i / cols);
         const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
         const ec = ELEMENT_COLORS[def.element];
-        ctx.fillStyle = '#0d0d20'; rr(ctx, bx, by, bw, bh, 10); ctx.fill();
-        ctx.strokeStyle = ec + '66'; ctx.lineWidth = 1.5; rr(ctx, bx, by, bw, bh, 10); ctx.stroke();
+        ctx.fillStyle = '#0d0d20'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
+        ctx.strokeStyle = ec + '66'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
 
         ctx.fillStyle = def.color;
         ctx.beginPath(); ctx.arc(bx + 36, by + 40, 22, 0, Math.PI * 2); ctx.fill();
@@ -278,8 +278,8 @@ export class OverlayRenderer {
         const col = i % cols, row = Math.floor(i / cols);
         const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
         ctx.fillStyle = def.isBoss ? '#1a0a1a' : '#0d0d1e';
-        rr(ctx, bx, by, bw, bh, 10); ctx.fill();
-        ctx.strokeStyle = def.color + '55'; ctx.lineWidth = 1.5; rr(ctx, bx, by, bw, bh, 10); ctx.stroke();
+        roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
+        ctx.strokeStyle = def.color + '55'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
 
         ctx.fillStyle = def.color;
         ctx.beginPath(); ctx.arc(bx + 30, by + 35, def.isBoss ? 20 : 15, 0, Math.PI * 2); ctx.fill();
@@ -305,8 +305,8 @@ export class OverlayRenderer {
         const col = i % 2, row = Math.floor(i / 2);
         const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
         const ec = ELEMENT_COLORS[def.golemType!];
-        ctx.fillStyle = '#0e0e18'; rr(ctx, bx, by, bw, bh, 10); ctx.fill();
-        ctx.strokeStyle = ec + '88'; ctx.lineWidth = 2; rr(ctx, bx, by, bw, bh, 10); ctx.stroke();
+        ctx.fillStyle = '#0e0e18'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
+        ctx.strokeStyle = ec + '88'; ctx.lineWidth = 2; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
 
         ctx.fillStyle = def.color;
         ctx.beginPath(); ctx.arc(bx + 32, by + 40, 18, 0, Math.PI * 2); ctx.fill();
@@ -335,7 +335,7 @@ export class OverlayRenderer {
     }
 
     const backR = { x: 20, y: ch - 50, w: 180, h: 34 };
-    btn(ctx, backR, '← Voltar ao Jogo', '#1a1a2e', '#6666aa');
+    drawButton(ctx, backR, '← Voltar ao Jogo', '#1a1a2e', '#6666aa');
     this.bestiaryRects['back'] = backR;
     ctx.textAlign = 'center';
   }
@@ -350,8 +350,8 @@ export class OverlayRenderer {
     ctx.fillText(`Onda: ${wave}    |    Pontuação: ${score}`, cw / 2, 230);
     const bw = 230, bh = 48, bx = cw / 2 - bw / 2;
     const restartRect = { x: bx, y: 295, w: bw, h: bh };
-    btn(ctx, restartRect, '⚔  Novo Jogo', '#3a0000', '#ff6666'); this.gameOverBtns['restart'] = restartRect;
+    drawButton(ctx, restartRect, '⚔  Novo Jogo', '#3a0000', '#ff6666'); this.gameOverBtns['restart'] = restartRect;
     const menuRect = { x: bx, y: 360, w: bw, h: bh };
-    btn(ctx, menuRect, '🏠  Menu Principal', '#1a1a2e', '#6666aa'); this.gameOverBtns['menu'] = menuRect;
+    drawButton(ctx, menuRect, '🏠  Menu Principal', '#1a1a2e', '#6666aa'); this.gameOverBtns['menu'] = menuRect;
   }
 }

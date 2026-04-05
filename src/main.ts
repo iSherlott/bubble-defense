@@ -1,4 +1,8 @@
+import { registerAllContent } from './content/registerAll';
 import { Game } from './game/Game';
+
+// ── Bootstrap: register all content once before creating Game ─────────────────
+registerAllContent();
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const game = new Game(canvas);

@@ -1,5 +1,5 @@
 import type { Rect } from '../RenderUtils';
-import { btn, rr } from '../RenderUtils';
+import { drawButton, roundedRect } from '../RenderUtils';
 
 export class DebugPanelRenderer {
   private debugBtns: Record<string, Rect> = {};
@@ -27,9 +27,9 @@ export class DebugPanelRenderer {
     const px = 10, py = 10;
 
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
-    rr(ctx, px, py, pw, ph, 8); ctx.fill();
+    roundedRect(ctx, px, py, pw, ph, 8); ctx.fill();
     ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 2;
-    rr(ctx, px, py, pw, ph, 8); ctx.stroke();
+    roundedRect(ctx, px, py, pw, ph, 8); ctx.stroke();
 
     ctx.fillStyle = '#ff4444'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'left';
     ctx.fillText('🐛 DEBUG  (F12 para fechar)', px + pad, py + 18);
@@ -37,7 +37,7 @@ export class DebugPanelRenderer {
     let by = py + 28;
     for (const [id, label] of cmds) {
       const r = { x: px + pad, y: by, w: pw - pad * 2, h: btnH };
-      btn(ctx, r, label, '#1a0a0a', '#ff8866');
+      drawButton(ctx, r, label, '#1a0a0a', '#ff8866');
       this.debugBtns[id] = r;
       by += btnH + gap;
     }

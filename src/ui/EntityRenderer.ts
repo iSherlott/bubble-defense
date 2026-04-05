@@ -35,7 +35,7 @@ export class EntityRenderer {
     if (tower.fusionDef) {
       ctx.fillText(tower.fusionDef.icon, x, y + 4);
     } else {
-      ctx.fillText(tower.def.element === 'fire' ? '🔥' : tower.def.element === 'water' ? '💧' : tower.def.element === 'earth' ? '🌍' : '💨', x, y + 4);
+      ctx.fillText(ELEMENT_ICONS[tower.def.element], x, y + 4);
     }
 
     // Cooldown arc
@@ -97,9 +97,12 @@ export class EntityRenderer {
       ctx.setLineDash([]);
     }
 
-    // Draw shape via render profile
+    // Draw shape via render profile (fallback chain: renderProfileId → id → base type → default)
     const profileId = enemy.def.renderProfileId ?? enemy.def.id;
-    const drawFn = getEnemyRenderProfile(profileId) ?? defaultDrawFn;
+    const baseId = profileId.replace(/_[^_]+$/, '');  // golem_fire → golem
+    const drawFn = getEnemyRenderProfile(profileId)
+      ?? (baseId !== profileId ? getEnemyRenderProfile(baseId) : undefined)
+      ?? defaultDrawFn;
     drawFn(ctx, x, y, r, enemy.def.color, !!enemy.def.isBoss);
 
     // Slow ring (temp)

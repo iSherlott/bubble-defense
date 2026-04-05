@@ -1,5 +1,5 @@
 import { GameConfig } from '../config';
-import { createEnemy, resetEnemyIds } from '../entities/Enemy';
+import { createEnemy, resetEnemyIds } from '../factories/EnemyFactory';
 import { enemyRegistry } from '../registries';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { Vec2 } from '../types';
@@ -85,39 +85,7 @@ export class WaveManager {
     this.currentWave++;
     this.isBossWave = this.currentWave % this.rules.bossEveryN === 0;
 
-    const rng = waveRng(this.currentWave * 1337 + 7);
-
-    if (this.isBossWave) {
-      const bossDefs = enemyRegistry.getBossDefs();
-      const bossIdx = Math.max(0, Math.floor((this.currentWave - this.rules.bossEveryN) / this.rules.bossEveryN)) % bossDefs.length;
-      const boss = bossDefs[bossIdx];
-      this.spawnQueues = [{ typeId: boss.id, count: 1, timer: 0, spawned: 0, isBoss: true, isElite: false }];
-    } else {
-      // Pick enemy types from data-driven pool
-      const pool = getEnemyPool(this.currentWave, this.rules);
-      const typeCount = Math.min(typeCountForWave(this.currentWave, this.rules), pool.length);
-      const chosen: string[] = [];
-      const poolCopy = [...pool];
-      for (let i = 0; i < typeCount; i++) {
-        const idx = Math.floor(rng() * poolCopy.length);
-        chosen.push(poolCopy.splice(idx, 1)[0]);
-      }
-
-      // Total enemy count for the wave (divided among types)
-      const totalCount = Math.round(cfg.enemy.waveBaseCount + this.currentWave * cfg.enemy.waveCountPerWave);
-      const perType = Math.max(1, Math.round(totalCount / chosen.length));
-
-      this.spawnQueues = chosen.map(typeId => ({
-        typeId, count: perType, timer: 0, spawned: 0, isBoss: false, isElite: false,
-      }));
-
-      // Elite units at wave 50+
-      const elites = eliteCountForWave(this.currentWave);
-      for (let i = 0; i < elites; i++) {
-        const eliteType = chosen[Math.floor(rng() * chosen.length)];
-        this.spawnQueues.push({ typeId: eliteType, count: 1, timer: 0, spawned: 0, isBoss: false, isElite: true });
-      }
-    }
+    this.spawnQueues = this.composeWavePool(this.currentWave);
 
     this.totalEnemiesThisWave  = this.spawnQueues.reduce((s, q) => s + q.count, 0);
     this.enemiesKilledThisWave = 0;
@@ -171,22 +139,47 @@ export class WaveManager {
   getNextWavePreview(): { types: string[]; isBoss: boolean; eliteCount: number; enemyCount: number } {
     const nextWave = this.currentWave + 1;
     const isBoss = nextWave % this.rules.bossEveryN === 0;
+    const queues = this.composeWavePool(nextWave);
+    const types = [...new Set(queues.map(q => q.typeId))];
+    const eliteCount = queues.filter(q => q.isElite).length;
+    const enemyCount = queues.reduce((s, q) => s + q.count, 0);
+    return { types, isBoss, eliteCount, enemyCount };
+  }
+
+  // ─── Wave Composition (shared by startWave + preview) ─────────────────────
+
+  private composeWavePool(wave: number): SpawnQueue[] {
+    const isBoss = wave % this.rules.bossEveryN === 0;
+    const rng = waveRng(wave * 1337 + 7);
+
     if (isBoss) {
       const bossDefs = enemyRegistry.getBossDefs();
-      const bossIdx = Math.max(0, Math.floor((nextWave - this.rules.bossEveryN) / this.rules.bossEveryN)) % bossDefs.length;
-      return { types: [bossDefs[bossIdx].id], isBoss: true, eliteCount: 0, enemyCount: 1 };
+      const bossIdx = Math.max(0, Math.floor((wave - this.rules.bossEveryN) / this.rules.bossEveryN)) % bossDefs.length;
+      return [{ typeId: bossDefs[bossIdx].id, count: 1, timer: 0, spawned: 0, isBoss: true, isElite: false }];
     }
-    const rng = waveRng(nextWave * 1337 + 7);
-    const pool = getEnemyPool(nextWave, this.rules);
-    const typeCount = Math.min(typeCountForWave(nextWave, this.rules), pool.length);
+
+    const pool = getEnemyPool(wave, this.rules);
+    const typeCount = Math.min(typeCountForWave(wave, this.rules), pool.length);
     const chosen: string[] = [];
     const poolCopy = [...pool];
     for (let i = 0; i < typeCount; i++) {
       const idx = Math.floor(rng() * poolCopy.length);
       chosen.push(poolCopy.splice(idx, 1)[0]);
     }
-    const totalCount = Math.round(cfg.enemy.waveBaseCount + nextWave * cfg.enemy.waveCountPerWave);
-    const elites = eliteCountForWave(nextWave);
-    return { types: chosen, isBoss: false, eliteCount: elites, enemyCount: totalCount + elites };
+
+    const totalCount = Math.round(cfg.enemy.waveBaseCount + wave * cfg.enemy.waveCountPerWave);
+    const perType = Math.max(1, Math.round(totalCount / chosen.length));
+
+    const queues: SpawnQueue[] = chosen.map(typeId => ({
+      typeId, count: perType, timer: 0, spawned: 0, isBoss: false, isElite: false,
+    }));
+
+    const elites = eliteCountForWave(wave);
+    for (let i = 0; i < elites; i++) {
+      const eliteType = chosen[Math.floor(rng() * chosen.length)];
+      queues.push({ typeId: eliteType, count: 1, timer: 0, spawned: 0, isBoss: false, isElite: true });
+    }
+
+    return queues;
   }
 }

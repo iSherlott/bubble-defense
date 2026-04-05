@@ -3,9 +3,9 @@ import type { Player } from '../player/Player';
 import { ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS, ELEMENT_DESCRIPTIONS,
   STAT_LABELS, STAT_DESCRIPTIONS, STAT_ICONS, OPPOSITE_ELEMENT,
   ARCHETYPE_DEFS } from '../constants';
-import { hasSave } from '../game/SaveSystem';
+import { hasSave } from '../services/SaveSystem';
 import type { Rect } from './RenderUtils';
-import { btn, rr, mulberry32, wrapText } from './RenderUtils';
+import { drawButton, roundedRect, mulberry32, wrapText } from './RenderUtils';
 
 export class MenuRenderer {
   private menuBtns: Record<string, Rect> = {};
@@ -42,10 +42,10 @@ export class MenuRenderer {
 
     const bw = 260, bh = 50, bx = cw / 2 - bw / 2;
     const ng = { x: bx, y: 240, w: bw, h: bh };
-    btn(ctx, ng, '⚔  Novo Jogo', '#2a2a5a', '#8888ff'); this.menuBtns['newGame'] = ng;
+    drawButton(ctx, ng, '⚔  Novo Jogo', '#2a2a5a', '#8888ff'); this.menuBtns['newGame'] = ng;
     const hasS = hasSave();
     const lg = { x: bx, y: 308, w: bw, h: bh };
-    btn(ctx, lg, '💾  Carregar Save', hasS ? '#1a3a1a' : '#1a1a2a', hasS ? '#55cc55' : '#445566');
+    drawButton(ctx, lg, '💾  Carregar Save', hasS ? '#1a3a1a' : '#1a1a2a', hasS ? '#55cc55' : '#445566');
     this.menuBtns['loadGame'] = lg;
 
     const elems: ElementType[] = ['fire', 'water', 'earth', 'wind'];
@@ -53,7 +53,7 @@ export class MenuRenderer {
     elems.forEach((el, i) => {
       const rx = cw / 2 - tw / 2 + i * (ew + gap), ry = 400;
       ctx.fillStyle = ELEMENT_COLORS[el] + '22'; ctx.strokeStyle = ELEMENT_COLORS[el] + '88';
-      ctx.lineWidth = 1; rr(ctx, rx, ry, ew, eh, 8); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 1; roundedRect(ctx, rx, ry, ew, eh, 8); ctx.fill(); ctx.stroke();
       ctx.fillStyle = ELEMENT_COLORS[el]; ctx.font = '24px serif'; ctx.fillText(ELEMENT_ICONS[el], rx + 24, ry + 42);
       ctx.font = 'bold 13px Segoe UI'; ctx.fillText(ELEMENT_NAMES[el], rx + ew / 2 + 12, ry + 28);
       ctx.font = '10px Segoe UI'; ctx.fillStyle = '#666688';
@@ -79,7 +79,7 @@ export class MenuRenderer {
     elems.forEach((el, i) => {
       const rx = startX + i * (cW + gap);
       ctx.fillStyle = ELEMENT_COLORS[el] + '18'; ctx.strokeStyle = ELEMENT_COLORS[el] + 'cc';
-      ctx.lineWidth = 2; rr(ctx, rx, cardY, cW, cH, 14); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 2; roundedRect(ctx, rx, cardY, cW, cH, 14); ctx.fill(); ctx.stroke();
       ctx.fillStyle = ELEMENT_COLORS[el]; ctx.font = '48px serif';
       ctx.fillText(ELEMENT_ICONS[el], rx + cW / 2, cardY + 64);
       ctx.font = 'bold 18px Segoe UI'; ctx.fillText(ELEMENT_NAMES[el], rx + cW / 2, cardY + 96);
@@ -88,10 +88,10 @@ export class MenuRenderer {
       ctx.fillStyle = '#778899'; ctx.font = '10px Segoe UI';
       wrapText(ELEMENT_DESCRIPTIONS[el], 28).forEach((l, li) => ctx.fillText(l, rx + cW / 2, cardY + 144 + li * 14));
       const by = cardY + cH - 40;
-      rr(ctx, rx + 14, by, cW - 28, 30, 8);
+      roundedRect(ctx, rx + 14, by, cW - 28, 30, 8);
       ctx.fillStyle = ELEMENT_COLORS[el] + '44'; ctx.fill();
       ctx.strokeStyle = ELEMENT_COLORS[el]; ctx.lineWidth = 1.5;
-      rr(ctx, rx + 14, by, cW - 28, 30, 8); ctx.stroke();
+      roundedRect(ctx, rx + 14, by, cW - 28, 30, 8); ctx.stroke();
       ctx.fillStyle = ELEMENT_COLORS[el]; ctx.font = 'bold 12px Segoe UI';
       ctx.fillText('Escolher', rx + cW / 2, by + 20);
       this.affinityRects.set(el, { x: rx, y: cardY, w: cW, h: cH });
@@ -117,7 +117,7 @@ export class MenuRenderer {
     archs.forEach((arch, i) => {
       const rx = startX + i * (cW + gap);
       ctx.fillStyle = arch.color + '18'; ctx.strokeStyle = arch.color + 'cc';
-      ctx.lineWidth = 2; rr(ctx, rx, cardY, cW, cH, 14); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 2; roundedRect(ctx, rx, cardY, cW, cH, 14); ctx.fill(); ctx.stroke();
 
       ctx.fillStyle = arch.color; ctx.font = '42px serif';
       ctx.fillText(arch.icon, rx + cW / 2, cardY + 52);
@@ -145,10 +145,10 @@ export class MenuRenderer {
       ctx.textAlign = 'center';
 
       const by = cardY + cH - 36;
-      rr(ctx, rx + 14, by, cW - 28, 28, 8);
+      roundedRect(ctx, rx + 14, by, cW - 28, 28, 8);
       ctx.fillStyle = arch.color + '44'; ctx.fill();
       ctx.strokeStyle = arch.color; ctx.lineWidth = 1.5;
-      rr(ctx, rx + 14, by, cW - 28, 28, 8); ctx.stroke();
+      roundedRect(ctx, rx + 14, by, cW - 28, 28, 8); ctx.stroke();
       ctx.fillStyle = arch.color; ctx.font = 'bold 12px Segoe UI';
       ctx.fillText('Escolher', rx + cW / 2, by + 19);
       this.archetypeRects.set(arch.id, { x: rx, y: cardY, w: cW, h: cH });
@@ -156,7 +156,7 @@ export class MenuRenderer {
 
     const backW = 120, backH = 28;
     const backRect = { x: cw / 2 - backW / 2, y: cardY + cH + 16, w: backW, h: backH };
-    btn(ctx, backRect, '← Voltar', '#1a1a2a', '#8888aa');
+    drawButton(ctx, backRect, '← Voltar', '#1a1a2a', '#8888aa');
     this.archetypeBackRect = backRect;
 
     ctx.textAlign = 'left';
@@ -193,9 +193,9 @@ export class MenuRenderer {
 
       const btnR = { x: panelX + panelW - 50, y: y + 8, w: 36, h: 32 };
       const canAdd = player.bonusPoints > 0;
-      rr(ctx, btnR.x, btnR.y, btnR.w, btnR.h, 6);
+      roundedRect(ctx, btnR.x, btnR.y, btnR.w, btnR.h, 6);
       ctx.fillStyle = canAdd ? statColors[k] + '33' : '#1a1a2a'; ctx.fill();
-      rr(ctx, btnR.x, btnR.y, btnR.w, btnR.h, 6);
+      roundedRect(ctx, btnR.x, btnR.y, btnR.w, btnR.h, 6);
       ctx.strokeStyle = canAdd ? statColors[k] : '#333344'; ctx.lineWidth = 1.5; ctx.stroke();
       ctx.fillStyle = canAdd ? '#eeeeff' : '#444455'; ctx.font = 'bold 18px Segoe UI';
       ctx.fillText('+', btnR.x + btnR.w / 2, btnR.y + 23);
@@ -207,9 +207,9 @@ export class MenuRenderer {
     const allSpent = player.bonusPoints <= 0;
     const startW = 180, startH = 38;
     const startRect = { x: cw / 2 - startW / 2, y: startY + statKeys.length * rowH + 20, w: startW, h: startH };
-    rr(ctx, startRect.x, startRect.y, startRect.w, startRect.h, 10);
+    roundedRect(ctx, startRect.x, startRect.y, startRect.w, startRect.h, 10);
     ctx.fillStyle = allSpent ? '#224422' : '#1a1a2a'; ctx.fill();
-    rr(ctx, startRect.x, startRect.y, startRect.w, startRect.h, 10);
+    roundedRect(ctx, startRect.x, startRect.y, startRect.w, startRect.h, 10);
     ctx.strokeStyle = allSpent ? '#55cc55' : '#333344'; ctx.lineWidth = 2; ctx.stroke();
     ctx.fillStyle = allSpent ? '#55ff55' : '#555566'; ctx.font = 'bold 16px Segoe UI';
     ctx.fillText(allSpent ? '⚔ Iniciar Partida' : 'Distribua todos os pontos', startRect.x + startRect.w / 2, startRect.y + 25);
@@ -217,7 +217,7 @@ export class MenuRenderer {
 
     const backW = 120, backH = 28;
     const backRect = { x: cw / 2 - backW / 2, y: startRect.y + startH + 14, w: backW, h: backH };
-    btn(ctx, backRect, '← Voltar', '#1a1a2a', '#8888aa');
+    drawButton(ctx, backRect, '← Voltar', '#1a1a2a', '#8888aa');
     this.bonusBackBtn = backRect;
 
     ctx.textAlign = 'left';
