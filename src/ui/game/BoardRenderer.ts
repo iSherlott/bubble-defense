@@ -1,6 +1,3 @@
-import type { ElementType } from '../../types';
-import type { BaseTower as Tower } from '../../entities/BaseTower';
-import type { BaseEnemy as Enemy } from '../../entities/BaseEnemy';
 import type { MapData } from '../../game/MapGenerator';
 import type { GameRenderState } from '../GameRenderer';
 import { CELL_SIZE } from '../../constants';

@@ -3,10 +3,8 @@ import type { GameRenderState } from '../GameRenderer';
 import {
   SIDEBAR_W, WAVE_BAR_H,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS,
-  MAX_LEVEL, TALENT_POINT_EVERY, MAX_TOWER_LEVEL, MAP_EXPAND_COST,
-  ITEM_RARITY_COLORS,
+  MAX_LEVEL, TALENT_POINT_EVERY, MAP_EXPAND_COST,
 } from '../../constants';
-import { GameConfig } from '../../config';
 import { towerRegistry, itemRegistry } from '../../registries';
 import type { Rect } from '../RenderUtils';
 import { btn, rr } from '../RenderUtils';

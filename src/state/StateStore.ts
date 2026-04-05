@@ -22,7 +22,7 @@ import type { Player } from '../player/Player';
 import type { SkillTree } from '../player/SkillTree';
 import type { WaveManager } from '../game/WaveManager';
 import type { MapData } from '../game/MapGenerator';
-import type { IGameContext, FloatingText, BurnZone } from '../core/GameContext';
+import type { IGameContext, FloatingText, BurnZone, ItemState } from '../core/GameContext';
 import type { Tower } from '../entities/Tower';
 
 import { GameState, createInitialState } from './GameState';
@@ -56,8 +56,25 @@ export class StateStore implements IGameContext {
 
   private _state: GameState;
 
+  /** Grouped item-state object (IGameContext contract). Live proxy into relics slice. */
+  readonly itemState!: ItemState;
+
   constructor(initialMap: MapData) {
     this._state = createInitialState(initialMap);
+
+    // Build a single live proxy object so ctx.itemState.x++ works correctly
+    const relics = this._state.relics;
+    Object.defineProperty(this, 'itemState', {
+      value: Object.defineProperties({} as ItemState, {
+        titanShieldCharges: { get: () => relics.titanShieldCharges, set: (v: number) => { relics.titanShieldCharges = v; }, enumerable: true },
+        titanShieldWaves:   { get: () => relics.titanShieldWaves,   set: (v: number) => { relics.titanShieldWaves   = v; }, enumerable: true },
+        cataclysmTimer:     { get: () => relics.cataclysmTimer,     set: (v: number) => { relics.cataclysmTimer     = v; }, enumerable: true },
+        lastTronoWave:      { get: () => relics.lastTronoWave,      set: (v: number) => { relics.lastTronoWave      = v; }, enumerable: true },
+        lastItemWave:       { get: () => relics.lastItemWave,       set: (v: number) => { relics.lastItemWave       = v; }, enumerable: true },
+      }),
+      writable: false,
+      enumerable: true,
+    });
 
     this.towerMgr    = new TowerSlice(this._state.towers);
     this.enemyMgr    = new EnemySlice(this._state.enemies);
