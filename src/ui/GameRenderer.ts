@@ -1,10 +1,9 @@
-import type { Vec2, ElementType, OwnedItem, ItemDropAnim } from '../types';
+import type { Vec2, ElementType, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
 import type { AnimationInstance } from '../types/animation';
 import type { BaseTower as Tower } from '../entities/BaseTower';
 import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
 import type { Player } from '../player/Player';
 import type { WaveManager } from '../systems/WaveManager';
-import type { UpgradePopup } from '../game/Game';
 import type { MapData } from '../systems/MapGenerator';
 import type { EntityRenderer } from './EntityRenderer';
 

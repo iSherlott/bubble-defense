@@ -1,11 +1,10 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim } from '../types';
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
 import type { AnimationInstance } from '../types/animation';
 import type { BaseTower as Tower } from '../entities/BaseTower';
 import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
 import type { Player } from '../player/Player';
 import type { SkillTree as TalentTree } from '../player/SkillTree';
 import type { WaveManager } from '../systems/WaveManager';
-import type { UpgradePopup } from '../game/Game';
 import type { MapData } from '../systems/MapGenerator';
 import { SIDEBAR_W, WAVE_BAR_H } from '../constants';
 import { MenuRenderer } from './MenuRenderer';

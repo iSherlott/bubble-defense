@@ -43,7 +43,7 @@ export class ItemsHudRenderer {
 
       if (owned.stacks > 1) {
         ctx.fillStyle = '#ffffff'; ctx.font = 'bold 8px Segoe UI'; ctx.textAlign = 'right';
-        ctx.fillText(`Ã—${owned.stacks}`, ix + iconSize - 1, hy + padding + iconSize - 1);
+        ctx.fillText(`×${owned.stacks}`, ix + iconSize - 1, hy + padding + iconSize - 1);
       }
       ctx.textAlign = 'left';
       ix += iconSize + gap;
@@ -65,7 +65,7 @@ export class ItemsHudRenderer {
 
       ctx.textAlign = 'center';
       ctx.fillStyle = rc; ctx.font = 'bold 10px Segoe UI';
-      ctx.fillText(`${hoveredDef.name}${hoveredStacks > 1 ? ` Ã—${hoveredStacks}` : ''}`, tx + tw / 2, ty + 14);
+      ctx.fillText(`${hoveredDef.name}${hoveredStacks > 1 ? ` ×${hoveredStacks}` : ''}`, tx + tw / 2, ty + 14);
       ctx.fillStyle = '#aaaacc'; ctx.font = '9px Segoe UI';
       ctx.fillText(`[${rarityName}]`, tx + tw / 2, ty + 24);
       lines.forEach((l, li) => {

@@ -134,7 +134,12 @@ function resolveBehaviors(def: import('../types').EnemyDef): import('../behavior
   return result;
 }
 
+let _registered = false;
+
 export function registerAllContent(): void {
+  if (_registered) return;
+  _registered = true;
+
   // ── Towers ──────────────────────────────────────────────────────────────────
   for (const def of TOWER_DEFS) {
     const behaviorId = def.magicBehaviorId ?? def.element;

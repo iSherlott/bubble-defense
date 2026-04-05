@@ -1,5 +1,5 @@
 import type { BaseTower as Tower } from '../../entities/BaseTower';
-import type { UpgradePopup } from '../../game/Game';
+import type { UpgradePopup } from '../../types';
 import { CELL_SIZE, ELEMENT_COLORS, ELEMENT_ICONS } from '../../constants';
 import { getFusionDef } from '../../constants';
 import { towerRegistry } from '../../registries';

@@ -53,19 +53,6 @@ export const STAT_ICONS: Record<string, string> = {
   agility:'⚡', luck:'🍀', vitality:'❤',
 };
 
-// ─── Wave Definitions ─────────────────────────────────────────────────────────
-export const WAVE_DEFS = [
-  [{ typeId:'goblin',  count:6  }],
-  [{ typeId:'goblin',  count:8  }, { typeId:'troll',  count:2 }],
-  [{ typeId:'harpy',   count:6  }, { typeId:'goblin', count:4 }],
-  [{ typeId:'troll',   count:4  }, { typeId:'harpy',  count:4 }],
-  [{ typeId:'goblin',  count:12 }, { typeId:'golem',  count:1 }],
-  [{ typeId:'golem',   count:3  }, { typeId:'harpy',  count:6 }],
-  [{ typeId:'troll',   count:6  }, { typeId:'goblin', count:8 }],
-  [{ typeId:'golem',   count:4  }, { typeId:'harpy',  count:8 }],
-  [{ typeId:'dragon',  count:1  }, { typeId:'golem',  count:3 }],
-];
-
 // ─── Content re-exports (backwards compatibility) ─────────────────────────────
 export { ELEMENT_COLORS, ELEMENT_ICONS, ELEMENT_NAMES, ELEMENT_DESCRIPTIONS, OPPOSITE_ELEMENT } from '../content/elements';
 export { TOWER_DEFS } from '../content/towers';

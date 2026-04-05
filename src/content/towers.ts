@@ -11,6 +11,7 @@ export const TOWER_DEFS: TowerDef[] = [
     magicBarMax: 100, magicBarGain: 15, magicBaseDamage: 55,
     description: 'Ataque normal. Magia: 3 bolas (1º, meio, último do range).',
     magicDescription: '✨ 3-alvo',
+    magicAnimationId: 'fire_burst',
   },
   {
     id: 'water', name: 'Torre de Água', element: 'water',
@@ -19,6 +20,7 @@ export const TOWER_DEFS: TowerDef[] = [
     magicBarMax: 100, magicBarGain: 10, magicBaseDamage: 35,
     description: 'Ataca devagar. Magia: -5% vel. permanente por acerto.',
     magicDescription: '✨ -5%vel perm.',
+    magicAnimationId: 'frost_nova',
   },
   {
     id: 'earth', name: 'Torre de Terra', element: 'earth',
@@ -27,6 +29,7 @@ export const TOWER_DEFS: TowerDef[] = [
     magicBarMax: 100, magicBarGain: 12, magicBaseDamage: 80,
     description: 'Ataque normal. Magia: dano em área (80px de raio).',
     magicDescription: '✨ AoE',
+    magicAnimationId: 'earth_quake',
   },
   {
     id: 'wind', name: 'Torre de Vento', element: 'wind',
@@ -35,5 +38,6 @@ export const TOWER_DEFS: TowerDef[] = [
     magicBarMax: 100, magicBarGain: 10, magicBaseDamage: 25,
     description: 'Ataca devagar. Magia: empurra inimigo 3 tiles para trás.',
     magicDescription: '✨ empurrão 3t',
+    magicAnimationId: 'wind_gust',
   },
 ];

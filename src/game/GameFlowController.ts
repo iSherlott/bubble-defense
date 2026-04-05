@@ -40,7 +40,7 @@ export class GameFlowController {
     this.initState(g);
     const seed = Date.now() & 0xffffff;
     this.regenerateMap(g, 0, seed);
-    g.screen = 'game';
+    g.requestScreen('game');
   }
 
   /** Start a new game with specific affinity and archetype */
@@ -51,7 +51,7 @@ export class GameFlowController {
     this.initState(g);
     const seed = Date.now() & 0xffffff;
     this.regenerateMap(g, 0, seed);
-    g.screen = 'game';
+    g.requestScreen('game');
   }
 
   /** Regenerate the map at a given tier */
@@ -78,7 +78,7 @@ export class GameFlowController {
     g.player = new Player();
     g.player.affinity = affinity;
     g.player.applyArchetype(id);
-    g.screen = 'bonus' as any;
+    g.requestScreen('bonus');
   }
 
   /** Internal: expand map to a specific tier */
@@ -141,7 +141,7 @@ export class GameFlowController {
     }
     g.itemState.lastItemWave = Math.floor(data.game.wave / 10) * 10;
 
-    g.screen = 'game';
+    g.requestScreen('game');
   }
 
   /** Save the current game state */

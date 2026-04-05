@@ -36,8 +36,8 @@ export interface TowerDef {
   targetingBehaviorId?: string;
   /** Render profile for visual appearance. */
   renderProfileId?: string;
-  /** Skill animation to play on magic cast. */
-  skillAnimationId?: string;
+  /** Animation ID to play when magic fires (looked up in AnimationRegistry). */
+  magicAnimationId?: string;
 }
 
 // ─── Enemy Definition ─────────────────────────────────────────────────────────
@@ -126,6 +126,10 @@ export interface ProjectileData {
 
 // ─── Game Screens ─────────────────────────────────────────────────────────────
 export type GameScreen = 'menu' | 'affinity' | 'archetype' | 'bonus' | 'game' | 'levelup' | 'talent' | 'gameover' | 'bestiary';
+
+// ─── UI State ─────────────────────────────────────────────────────────────────
+export interface UpgradePopup { col: number; row: number; }
+
 // ─── Archetype System ────────────────────────────────────────────────────────
 export interface ArchetypeDef {
   id: string;

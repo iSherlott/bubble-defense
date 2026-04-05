@@ -1,4 +1,4 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim } from '../types';
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
 import { CELL_SIZE, BASE_LIVES, INITIAL_GOLD, MAP_TIER_AT } from '../constants';
 import { SingleTower as Tower } from '../entities/towers/SingleTower';
 import type { BaseEnemy } from '../entities/BaseEnemy';
@@ -16,15 +16,12 @@ import { EffectSystem } from '../systems/EffectSystem';
 import { EnemyBehaviorSystem } from '../systems/EnemyBehaviorSystem';
 import { RewardSystem } from '../systems/RewardSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
-import { registerAllContent } from '../content/registerAll';
 
 // ── Extracted Services ────────────────────────────────────────────────────────
 import { TowerService } from '../services/TowerService';
 import { GameInputController } from './GameInputController';
 import { GameFlowController } from './GameFlowController';
 import { DebugService } from '../services/DebugService';
-
-export interface UpgradePopup { col: number; row: number; }
 
 export class Game implements IGameContext {
   canvas: HTMLCanvasElement;
@@ -99,8 +96,6 @@ export class Game implements IGameContext {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
-
-    registerAllContent();
 
     // Core systems
     this.itemSystem = new ItemSystem();

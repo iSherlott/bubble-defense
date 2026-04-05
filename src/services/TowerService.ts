@@ -58,12 +58,21 @@ export class TowerService {
     return Math.round(MAP_EXPAND_COST * (1 - this.itemSystem.getDiscount(items)));
   }
 
-  /** Can a tower be placed at this cell? (bounds, path, gold) */
+  /** Can a tower be placed at this cell? (bounds, path, gold, occupancy, slot integrity) */
   canPlace(ctx: IGameContext, typeId: string, col: number, row: number, slot: 0 | 1): boolean {
     const { cols, rows, pathCells } = ctx.map;
     if (col < 0 || col >= cols || row < 0 || row >= rows) return false;
     if (pathCells.has(`${col},${row}`)) return false;
     if (!towerRegistry.has(typeId)) return false;
+    if (this.isCellFull(ctx.towers, col, row)) return false;
+
+    // Slot integrity: slot 1 requires a primary tower (slot 0) already present
+    if (slot === 1) {
+      const here = this.towersAt(ctx.towers, col, row);
+      const hasPrimary = here.some(t => !t.isSecondary);
+      if (!hasPrimary) return false;
+    }
+
     const cost = slot === 1
       ? this.towerCost(typeId, ctx.towers, ctx.items) * 2
       : this.towerCost(typeId, ctx.towers, ctx.items);
@@ -182,12 +191,22 @@ export class TowerService {
     return true;
   }
 
-  /** Sell a tower and refund 50% of gold spent */
+  /** Sell a tower and refund 50% of gold spent. Promotes secondary to primary if needed. */
   sellTower(ctx: IGameContext, tower: BaseTower): void {
     const refund = Math.floor(tower.goldSpent / 2);
     ctx.gold += refund;
     ctx.addFT({ x: tower.pixelX, y: tower.pixelY }, `+${refund}g 🏷`, '#ffdd44');
     ctx.towers = ctx.towers.filter(t => t.id !== tower.id);
+
+    // If we sold the primary (slot 0), promote the remaining secondary to primary
+    if (!tower.isSecondary) {
+      const remaining = this.towersAt(ctx.towers, tower.gridX, tower.gridY);
+      const orphan = remaining.find(t => t.isSecondary);
+      if (orphan) {
+        orphan.isSecondary = false;
+        orphan.slotIndex = 0;
+      }
+    }
   }
 
   /** Move all towers from source cell to destination. Returns false if blocked. */
@@ -200,7 +219,8 @@ export class TowerService {
     const cellTowers = this.towersAt(ctx.towers, tower.gridX, tower.gridY);
     const destTowers = this.towersAt(ctx.towers, col, row);
 
-    if (destTowers.length > 0) {
+    // Destination must have room for all towers being moved
+    if (destTowers.length + cellTowers.length > 2) {
       ctx.addFT({ x: tower.pixelX, y: tower.pixelY }, 'Célula ocupada', '#ff6666');
       return false;
     }

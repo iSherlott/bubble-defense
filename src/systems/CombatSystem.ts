@@ -106,6 +106,17 @@ export class CombatSystem {
     // Normal magic → delegate to element behavior from registry
     const blueprint = towerRegistry.get(tower.def.id);
     blueprint.magicBehavior.cast(ctx, tower, affM, extra);
+
+    // Data-driven animation: trigger the tower's magic animation if defined
+    if (tower.def.magicAnimationId) {
+      ctx.animations.request({
+        id: tower.def.magicAnimationId,
+        sourceX: tower.pixelX,
+        sourceY: tower.pixelY,
+        radius: tower.getRange(),
+        color: tower.def.accentColor,
+      });
+    }
   }
 
   private fireFusionMagic(ctx: IGameContext, tower: BaseTower, affM: number, extra: ProjectileData[]): void {
