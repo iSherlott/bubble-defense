@@ -81,7 +81,7 @@ export class GameRenderer {
 
     this.board.render(ctx, map, gw, gh, state, this.entityRenderer);
     this.sidebar.render(ctx, gw, gh, state);
-    this.itemsHud.render(ctx, gw, g.items, { x: 0, y: 0 });
+    this.itemsHud.render(ctx, gw, g.items, state.mousePos);
     this.waveBar.render(ctx, gw, gh, g.waveManager, g.bossBarState);
 
 

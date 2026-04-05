@@ -3,8 +3,8 @@ import type { Player } from '../player/Player';
 import type { SkillTree as TalentTree } from '../player/SkillTree';
 import { STAT_LABELS, STAT_DESCRIPTIONS, STAT_ICONS,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS,
-  TALENT_POINT_EVERY } from '../constants';
-import { towerRegistry, enemyRegistry } from '../registries';
+  TALENT_POINT_EVERY, ITEM_RARITY_COLORS } from '../constants';
+import { towerRegistry, enemyRegistry, itemRegistry } from '../registries';
 import type { Rect } from './RenderUtils';
 import { drawButton, roundedRect, mulberry32, wrapText, wrapTextLeft } from './RenderUtils';
 
@@ -14,6 +14,7 @@ export class OverlayRenderer {
   private talentBackRect: Rect | null = null;
   private bestiaryRects: Record<string, Rect> = {};
   private bestiaryPage = 0;
+  private bestiarySource: 'game' | 'menu' = 'game';
   private gameOverBtns: Record<string, Rect> = {};
   private _mousePos: { x: number; y: number } | null = null;
 
@@ -22,10 +23,12 @@ export class OverlayRenderer {
   getTalentBackRect() { return this.talentBackRect; }
   getGameOverButtonRects() { return this.gameOverBtns; }
   getBestiaryRects() { return this.bestiaryRects; }
+  getBestiarySource() { return this.bestiarySource; }
+  setBestiarySource(src: 'game' | 'menu') { this.bestiarySource = src; }
   setMousePos(pos: { x: number; y: number }) { this._mousePos = pos; }
 
   handleBestiaryTabClick(p: { x: number; y: number }, hit: (p: { x: number; y: number }, r: { x: number; y: number; w: number; h: number }) => boolean) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const r = this.bestiaryRects[`tab_${i}`];
       if (r && hit(p, r)) { this.bestiaryPage = i; break; }
     }
@@ -221,8 +224,9 @@ export class OverlayRenderer {
     ctx.fillStyle = '#aaaaff'; ctx.font = 'bold 20px Segoe UI';
     ctx.fillText('📖 Mostruário', cw / 2, 34);
 
-    const tabs = ['Torres', 'Inimigos', 'Golems Elementais'];
-    const tw = 180, tgap = 12, totalTW = tabs.length * tw + (tabs.length - 1) * tgap;
+    // ─── Tabs ──────────────────────────────────────────────────────────────────
+    const tabs = ['Torres', 'Inimigos', 'Golems', 'Relíquias'];
+    const tw = 155, tgap = 10, totalTW = tabs.length * tw + (tabs.length - 1) * tgap;
     const tx0 = cw / 2 - totalTW / 2;
     tabs.forEach((tab, i) => {
       const r = { x: tx0 + i * (tw + tgap), y: 48, w: tw, h: 28 };
@@ -236,10 +240,17 @@ export class OverlayRenderer {
       this.bestiaryRects[`tab_${i}`] = r;
     });
 
-    const startY = 88;
+    const startY = 90;
 
+    // ─── Tab 0: Torres ─────────────────────────────────────────────────────────
     if (this.bestiaryPage === 0) {
-      const cols = 2, bw = (cw - 60) / cols, bh = 160, gap = 12;
+      const magicDesc: Record<string, string> = {
+        fire:  '✨ Dispara 3 projéteis mágicos (1º, meio, último do range)',
+        water: '✨ Aplica -5% de velocidade permanente por acerto mágico',
+        earth: '✨ Explosão em área (80px de raio) com dano mágico',
+        wind:  '✨ Empurra o alvo 3 tiles para trás na rota',
+      };
+      const cols = 2, bw = (cw - 60) / cols, bh = 170, gap = 10;
       towerRegistry.getAllDefs().forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
         const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
@@ -247,33 +258,41 @@ export class OverlayRenderer {
         ctx.fillStyle = '#0d0d20'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = ec + '66'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
 
+        // Tower circle icon
         ctx.fillStyle = def.color;
-        ctx.beginPath(); ctx.arc(bx + 36, by + 40, 22, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bx + 36, by + 42, 22, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = def.accentColor; ctx.lineWidth = 2; ctx.stroke();
         ctx.font = '18px serif'; ctx.fillStyle = ec; ctx.textAlign = 'center';
-        ctx.fillText(ELEMENT_ICONS[def.element], bx + 36, by + 47);
+        ctx.fillText(ELEMENT_ICONS[def.element], bx + 36, by + 49);
 
         ctx.textAlign = 'left';
         ctx.fillStyle = ec; ctx.font = 'bold 13px Segoe UI';
         ctx.fillText(def.name, bx + 70, by + 22);
         ctx.fillStyle = '#8888aa'; ctx.font = '9px Segoe UI';
         ctx.fillText(`Elemento: ${ELEMENT_NAMES[def.element]}  |  Custo base: ${def.baseCost}g`, bx + 70, by + 36);
-        ctx.fillStyle = '#777799'; ctx.font = '9px Segoe UI';
-        ctx.fillText(`Dano: ${def.baseDamage}  Range: ${def.baseRange}  Cadência: ${def.baseFireRate}/s`, bx + 70, by + 50);
-        ctx.fillText(`Magia: ${def.magicBaseDamage} dmg  |  Barra: ${def.magicBarMax} (gain ${def.magicBarGain}/tiro)`, bx + 70, by + 63);
+        ctx.fillStyle = '#777799';
+        ctx.fillText(`Dano: ${def.baseDamage}  Alcance: ${def.baseRange}  Cadência: ${def.baseFireRate}/s`, bx + 70, by + 50);
+        ctx.fillText(`Barra de magia: ${def.magicBarMax} pts  (${def.magicBarGain} pts/tiro)`, bx + 70, by + 63);
+        ctx.fillText(`Dano mágico base: ${def.magicBaseDamage}`, bx + 70, by + 76);
 
         ctx.fillStyle = '#5566aa'; ctx.font = '10px Segoe UI';
-        wrapTextLeft(ctx, def.description, bx + 12, by + 85, bw - 20, 14);
+        wrapTextLeft(ctx, def.description, bx + 12, by + 100, bw - 20, 13);
 
-        ctx.fillStyle = '#446666'; ctx.font = '9px Segoe UI';
-        const magicLabels: Record<string, string> = { fire: '✨ 3-alvo', water: '✨ -5%vel perm.', earth: '✨ AoE', wind: '✨ empurrão 3t' };
-        ctx.fillText(`✨ ${magicLabels[def.element]}`, bx + 12, by + bh - 14);
+        // Magic ability
+        ctx.fillStyle = ec; ctx.font = 'bold 9px Segoe UI';
+        wrapTextLeft(ctx, magicDesc[def.element] ?? '', bx + 12, by + bh - 22, bw - 20, 11);
       });
     }
 
+    // ─── Tab 1: Inimigos ───────────────────────────────────────────────────────
     else if (this.bestiaryPage === 1) {
       const allEnemies = [...enemyRegistry.getStandardDefs(), ...enemyRegistry.getBossDefs()];
-      const cols = 2, bw = (cw - 60) / cols, bh = 130, gap = 10;
+      const cols = 2, bw = (cw - 60) / cols, bh = 140, gap = 8;
+      const bossAbilityDesc: Record<string, string> = {
+        summon_adds:  '💀 Habilidade: Invoca goblins a cada 25% de HP perdido',
+        fire_trail:   '💀 Habilidade: Deixa rastro de fogo que danifica torres',
+        shield_phase: '💀 Habilidade: Fica imune por 3s ao chegar a 50% de HP',
+      };
       allEnemies.forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
         const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
@@ -282,25 +301,48 @@ export class OverlayRenderer {
         ctx.strokeStyle = def.color + '55'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
 
         ctx.fillStyle = def.color;
-        ctx.beginPath(); ctx.arc(bx + 30, by + 35, def.isBoss ? 20 : 15, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bx + 30, by + 32, def.isBoss ? 20 : 14, 0, Math.PI * 2); ctx.fill();
+        if (def.isBoss) {
+          ctx.strokeStyle = '#ff44ff'; ctx.lineWidth = 2; ctx.stroke();
+        }
 
         ctx.textAlign = 'left';
         ctx.fillStyle = def.isBoss ? '#ff88ff' : def.color; ctx.font = `bold 12px Segoe UI`;
-        ctx.fillText(`${def.isBoss ? '💀 ' : ''} ${def.name}`, bx + 60, by + 18);
+        ctx.fillText(`${def.isBoss ? '💀 ' : ''}${def.name}`, bx + 58, by + 18);
         ctx.fillStyle = '#777799'; ctx.font = '9px Segoe UI';
-        ctx.fillText(`HP: ${def.baseHp}  Vel: ${def.speed}  Agi: ${def.agility}  Vidas: ${def.baseLivesLost}  XP: ${def.xp}`, bx + 60, by + 32);
-        const immN = ELEMENT_NAMES[def.immune];
-        const halfN = def.halfElements.map(e => ELEMENT_NAMES[e]).join(', ');
+        ctx.fillText(`HP: ${def.baseHp}  Vel: ${def.speed}  Agi: ${def.agility}  Vidas: ${def.baseLivesLost}  XP: ${def.xp}  Recomp.: ${def.reward}g`, bx + 58, by + 32);
+
+        // Elemental info
         const allEl: Array<'fire' | 'water' | 'earth' | 'wind'> = ['fire', 'water', 'earth', 'wind'];
-        const weak = allEl.find(e => e !== def.immune && !def.halfElements.includes(e))!;
-        ctx.fillText(`Imune: ${immN}  |  Metade: ${halfN}  |  Fraco: ${ELEMENT_NAMES[weak]}`, bx + 60, by + 46);
+        const weakEl = allEl.filter(e => e !== def.immune && !def.halfElements.includes(e));
+        const immStr = `${ELEMENT_ICONS[def.immune]} Imune: ${ELEMENT_NAMES[def.immune]}`;
+        const halfStr = def.halfElements.length > 0
+          ? `  |  ½: ${def.halfElements.map(e => ELEMENT_NAMES[e]).join(', ')}`
+          : '';
+        const weakStr = weakEl.length > 0
+          ? `  |  Fraco: ${weakEl.map(e => ELEMENT_NAMES[e]).join(', ')}`
+          : '';
+        ctx.fillText(immStr + halfStr + weakStr, bx + 58, by + 46);
+
         ctx.fillStyle = '#556688'; ctx.font = '9px Segoe UI';
-        wrapTextLeft(ctx, def.description, bx + 8, by + 68, bw - 16, 13);
+        wrapTextLeft(ctx, def.description, bx + 8, by + 65, bw - 16, 12);
+
+        if (def.isBoss && def.bossAbility && bossAbilityDesc[def.bossAbility]) {
+          ctx.fillStyle = '#cc66cc'; ctx.font = 'bold 9px Segoe UI';
+          ctx.fillText(bossAbilityDesc[def.bossAbility], bx + 8, by + bh - 10);
+        }
       });
     }
 
-    else {
-      const bw = (cw - 60) / 2, bh = 150, gap = 12;
+    // ─── Tab 2: Golems ─────────────────────────────────────────────────────────
+    else if (this.bestiaryPage === 2) {
+      const bw = (cw - 60) / 2, bh = 155, gap = 12;
+      const golemAbilities: Record<string, string> = {
+        fire:  '🔥 Imune a qualquer dano com componente de Fogo',
+        water: '💧 Recupera HP dentro de poças de água (+0.01% máx/s)',
+        earth: '🌍 Absorve parte do dano recebido por golems aliados próximos (raio 80px)',
+        wind:  '💨 Completamente imune ao efeito de empurrão do Vento',
+      };
       enemyRegistry.getGolemDefs().forEach((def, i) => {
         const col = i % 2, row = Math.floor(i / 2);
         const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
@@ -309,33 +351,94 @@ export class OverlayRenderer {
         ctx.strokeStyle = ec + '88'; ctx.lineWidth = 2; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
 
         ctx.fillStyle = def.color;
-        ctx.beginPath(); ctx.arc(bx + 32, by + 40, 18, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bx + 32, by + 42, 18, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = ec; ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = '#111'; ctx.fillRect(bx + 23, by + 35, 18, 5);
-        ctx.fillStyle = ec; ctx.font = 'bold 9px Segoe UI'; ctx.textAlign = 'center';
-        ctx.fillText(ELEMENT_ICONS[def.golemType!], bx + 32, by + 55);
+        ctx.font = '13px "Segoe UI Emoji", serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = ec;
+        ctx.fillText(ELEMENT_ICONS[def.golemType!], bx + 32, by + 56);
 
         ctx.textAlign = 'left';
         ctx.fillStyle = ec; ctx.font = 'bold 13px Segoe UI';
-        ctx.fillText(def.name, bx + 58, by + 22);
+        ctx.fillText(def.name, bx + 60, by + 22);
         ctx.fillStyle = '#888899'; ctx.font = '9px Segoe UI';
-        ctx.fillText(`HP: ${def.baseHp}  Vel: ${def.speed}  Agi: ${def.agility}`, bx + 58, by + 36);
-        ctx.fillText(`Imune: ${ELEMENT_NAMES[def.immune]}`, bx + 58, by + 48);
+        ctx.fillText(`HP: ${def.baseHp}  Vel: ${def.speed}  Agi: ${def.agility}  Vidas: ${def.baseLivesLost}`, bx + 60, by + 36);
+        ctx.fillText(`${ELEMENT_ICONS[def.immune]} Imune: ${ELEMENT_NAMES[def.immune]}  |  Recomp.: ${def.reward}g`, bx + 60, by + 48);
+
         ctx.fillStyle = '#6688aa'; ctx.font = '10px Segoe UI';
-        wrapTextLeft(ctx, def.description, bx + 8, by + 75, bw - 16, 13);
-        const abilities: Record<string, string> = {
-          fire: '🔥 Cura por dano recebido',
-          water: '💧 Cura em poças de água',
-          earth: '🌍 Absorve dano de aliados próximos',
-          wind: '💨 Imune ao empurrão'
-        };
+        wrapTextLeft(ctx, def.description, bx + 8, by + 70, bw - 16, 12);
+
         ctx.fillStyle = ec; ctx.font = 'bold 9px Segoe UI';
-        ctx.fillText(abilities[def.golemType!] ?? '', bx + 8, by + bh - 12);
+        wrapTextLeft(ctx, golemAbilities[def.golemType!] ?? '', bx + 8, by + bh - 22, bw - 16, 11);
       });
     }
 
-    const backR = { x: 20, y: ch - 50, w: 180, h: 34 };
-    drawButton(ctx, backR, '← Voltar ao Jogo', '#1a1a2e', '#6666aa');
+    // ─── Tab 3: Relíquias ──────────────────────────────────────────────────────
+    else {
+      const rarityOrder = ['common', 'rare', 'epic', 'legendary'] as const;
+      const rarityLabel: Record<string, string> = {
+        common: 'Comum', rare: 'Rara', epic: 'Épica', legendary: 'Lendária',
+      };
+      const allItems = itemRegistry.getAllDefs();
+      const cols = 3, bw = (cw - 60) / cols, bh = 100, gap = 8;
+      let globalIdx = 0;
+
+      for (const rarity of rarityOrder) {
+        const group = allItems.filter(d => d.rarity === rarity);
+        if (group.length === 0) continue;
+
+        // Rarity section header
+        if (globalIdx % cols !== 0) globalIdx += cols - (globalIdx % cols); // align to row start
+        const hRow = Math.floor(globalIdx / cols);
+        const hY = startY + hRow * (bh + gap);
+        const rc = ITEM_RARITY_COLORS[rarity];
+        ctx.fillStyle = rc + '33';
+        roundedRect(ctx, 30, hY - 4, cw - 60, 18, 4); ctx.fill();
+        ctx.fillStyle = rc; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'left';
+        ctx.fillText(`── ${rarityLabel[rarity].toUpperCase()} ──`, 38, hY + 9);
+        ctx.textAlign = 'center';
+        globalIdx += cols; // skip header row
+
+        for (const def of group) {
+          const col = globalIdx % cols, row = Math.floor(globalIdx / cols);
+          const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
+          const rc2 = ITEM_RARITY_COLORS[def.rarity];
+
+          ctx.fillStyle = def.rarity === 'legendary' ? '#1a1000'
+            : def.rarity === 'epic' ? '#130020'
+            : def.rarity === 'rare' ? '#07102a'
+            : '#0d0d1c';
+          roundedRect(ctx, bx, by, bw, bh, 8); ctx.fill();
+          ctx.strokeStyle = rc2 + '99'; ctx.lineWidth = 1.5;
+          roundedRect(ctx, bx, by, bw, bh, 8); ctx.stroke();
+
+          // Icon
+          ctx.font = '22px "Segoe UI Emoji", serif'; ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(def.icon, bx + 22, by + 34);
+
+          // Name + rarity
+          ctx.textAlign = 'left';
+          ctx.fillStyle = rc2; ctx.font = 'bold 10px Segoe UI';
+          ctx.fillText(def.name, bx + 42, by + 16);
+          ctx.fillStyle = rc2 + 'aa'; ctx.font = '8px Segoe UI';
+          ctx.fillText(`[${rarityLabel[def.rarity]}]`, bx + 42, by + 27);
+
+          // Description
+          ctx.fillStyle = '#aaaacc'; ctx.font = '9px Segoe UI';
+          wrapTextLeft(ctx, def.description, bx + 8, by + 50, bw - 16, 12);
+
+          globalIdx++;
+        }
+        // fill rest of last row
+        const rem = globalIdx % cols;
+        if (rem !== 0) globalIdx += cols - rem;
+      }
+    }
+
+    // ─── Back button ───────────────────────────────────────────────────────────
+    const backLabel = this.bestiarySource === 'menu' ? '← Voltar ao Menu' : '← Voltar ao Jogo';
+    const backR = { x: 20, y: ch - 50, w: 200, h: 34 };
+    drawButton(ctx, backR, backLabel, '#1a1a2e', '#6666aa');
     this.bestiaryRects['back'] = backR;
     ctx.textAlign = 'center';
   }
