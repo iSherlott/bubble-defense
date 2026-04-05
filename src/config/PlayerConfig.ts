@@ -1,7 +1,7 @@
 // ─── Player Stats & Leveling Configuration ───────────────────────────────────
 export class PlayerConfig {
   // Leveling
-  readonly maxLevel          = 50;
+  readonly maxLevel          = 100;
   readonly talentPointEvery  = 10;  // earn 1 talent point per N levels
 
   // Starting stats
@@ -14,7 +14,7 @@ export class PlayerConfig {
   readonly agilityFireRate       = 0.05;  // +5% fire rate per point
   readonly luckCritChance        = 0.01;  // crit chance per luck point
   readonly luckCritMult          = 0.10;  // crit multiplier per luck point (1 + luck×this)
-  readonly luckGoldBonus         = 0.02;  // gold reward multiplier per luck point
+  readonly luckGoldBonus         = 0.012; // gold reward multiplier per luck point (was 2%, reduced to curb snowball)
   readonly vitalityRegenPerPoint = 0.25;  // lives regen per wave per vitality point
 
   // Hit chance

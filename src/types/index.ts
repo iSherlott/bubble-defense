@@ -62,6 +62,8 @@ export interface EnemyDef {
   behaviorIds?: string[];
   golemType?: ElementType;   // elemental golem variant with special ability
   isElite?: boolean;         // elite unit (set at runtime, 10× power)
+  /** Element type of disabler aura — disables towers of this element */
+  disablerElement?: ElementType;
   /** Render profile ID for visual appearance. Defaults to enemy id if not set. */
   renderProfileId?: string;
 }
@@ -139,6 +141,34 @@ export interface ArchetypeDef {
   color: string;
   baseStats: Stats;
 }
+// ─── Evolution System ─────────────────────────────────────────────────────────
+export interface EvolutionDef {
+  id: string;
+  name: string;
+  element: ElementType;
+  icon: string;
+  color: string;
+  description: string;
+  /** Short tactical role label (e.g. "Anti-Elite", "Waveclear") */
+  roleLabel: string;
+  /** Strengths summary shown in UI */
+  strengths: string;
+  /** Weaknesses summary shown in UI */
+  weaknesses: string;
+  /** Multiplier on baseDamage */
+  damageMult: number;
+  /** Multiplier on baseFireRate */
+  fireRateMult: number;
+  /** Multiplier on baseRange */
+  rangeMult: number;
+  /** Multiplier on magicBaseDamage */
+  magicDamageMult: number;
+  /** Magic behavior ID override (registered in MagicBehaviorRegistry) */
+  magicBehaviorId: string;
+  /** Optional: multiplier on magicBarMax (e.g. 1.5 = slower charge) */
+  magicBarMaxMult?: number;
+}
+
 // ─── Fusion System ────────────────────────────────────────────────────────────
 export type FusionId = string;  // e.g. 'fire+earth' => 'magma'
 
@@ -224,6 +254,7 @@ export interface SaveData {
       goldSpent: number;
       isSecondary: boolean;
       fusionId?: string;
+      evolutionId?: string;
     }>;
   };
   timestamp: number;

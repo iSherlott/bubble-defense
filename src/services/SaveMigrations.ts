@@ -5,16 +5,21 @@
 type MigrationFn = (data: Record<string, unknown>) => Record<string, unknown>;
 
 const MIGRATIONS: Record<number, MigrationFn> = {
-  // Example: when version 2 is introduced, add:
-  // 1: (data) => {
-  //   // transform v1 data into v2 shape
-  //   data.version = 2;
-  //   return data;
-  // },
+  1: (data) => {
+    // v1 → v2: add evolutionId to saved towers
+    const towers = data.towers as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(towers)) {
+      for (const t of towers) {
+        if (t.evolutionId === undefined) t.evolutionId = null;
+      }
+    }
+    data.version = 2;
+    return data;
+  },
 };
 
 /** The latest save version supported by the current code. */
-export const CURRENT_SAVE_VERSION = 1;
+export const CURRENT_SAVE_VERSION = 2;
 
 /**
  * Apply all necessary migrations to bring `data` up to CURRENT_SAVE_VERSION.

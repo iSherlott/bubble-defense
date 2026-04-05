@@ -16,6 +16,13 @@ export class BossEnemy extends BaseEnemy {
   shieldTimer: number;
   shieldTriggered: boolean;
 
+  /**
+   * Generic per-boss phase state used by behavior classes.
+   * Key naming convention: '<behaviorPrefix>_<field>'.
+   * All values are numbers (0 = false/inactive, positive = timer or flag).
+   */
+  phaseData: Record<string, number> = {};
+
   override get shieldActive(): boolean { return this._shieldActive; }
   set shieldActive(v: boolean) { this._shieldActive = v; }
 

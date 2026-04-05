@@ -160,7 +160,7 @@ export class TsunamiFusionBehavior implements FusionBehavior {
         components: dualComponents,
       }));
       if (t.def.golemType !== 'wind') {
-        t.distanceTraveled = Math.max(0, t.distanceTraveled - WIND_PUSH_PX * 2);
+        t.applyPush(WIND_PUSH_PX * 2);
       }
     }
   }
@@ -251,7 +251,7 @@ export class EternalHurricaneFusionBehavior implements FusionBehavior {
         color: fusion.color, isMagic: true,
       }));
       if (t.def.golemType !== 'wind') {
-        t.distanceTraveled = Math.max(CELL_SIZE, t.distanceTraveled - pushPx);
+        t.applyPush(pushPx);
         t.stunRemaining = Math.max(t.stunRemaining, 1.5);
       }
     }

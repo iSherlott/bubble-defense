@@ -2,9 +2,10 @@ import type { BaseTower as Tower } from '../../entities/BaseTower';
 import type { UpgradePopup } from '../../types';
 import { CELL_SIZE, ELEMENT_COLORS, ELEMENT_ICONS } from '../../constants';
 import { getFusionDef } from '../../constants';
-import { towerRegistry } from '../../registries';
+import { towerRegistry, evolutionRegistry } from '../../registries';
+import { GameConfig } from '../../config';
 import type { Rect } from '../RenderUtils';
-import { drawButton, roundedRect } from '../RenderUtils';
+import { drawButton, roundedRect, wrapTextLeft } from '../RenderUtils';
 
 export class UpgradePopupRenderer {
   private upgradeBtns: Record<string, Rect> = {};
@@ -30,10 +31,15 @@ export class UpgradePopupRenderer {
     const here = towersAt(popup.col, popup.row);
     const hasSynergy = here.length >= 2;
     const synergyPct = hasSynergy ? Math.round(getSynergyBonus(here[0]) * 100) : 0;
-    const pw = 252, towerH = 60, actionH = 26, headerH = hasSynergy ? 48 : 34, add2H = 60, closeH = 28;
+    const hasEvolution = here.some(t => t.needsEvolution);
+    const evoTower = here.find(t => t.needsEvolution);
+    const evoDefs = evoTower ? evolutionRegistry.getByElement(evoTower.def.element) : [];
+    const pw = hasEvolution ? 320 : 252;
+    const towerH = 60, actionH = 26, headerH = hasSynergy ? 48 : 34, add2H = 60, closeH = 28;
     const fusionH = canFuse ? 36 : 0;
+    const evoH = hasEvolution ? (16 + evoDefs.length * 72) : 0;
     const towerRows = here.reduce((_ , __) => _ + towerH + actionH + 6, 0);
-    const ph = headerH + towerRows + (here.length < 2 ? add2H : 0) + fusionH + closeH + 20;
+    const ph = headerH + towerRows + (here.length < 2 ? add2H : 0) + fusionH + evoH + closeH + 20;
 
     let px = popup.col * CELL_SIZE + CELL_SIZE + 4;
     let py = popup.row * CELL_SIZE;
@@ -82,8 +88,11 @@ export class UpgradePopupRenderer {
       const role = tower.isSecondary
         ? '[2ª]'
         : tower.fusionDef ? `[${tower.fusionDef.icon} ${tower.fusionDef.name}]`
+        : tower.evolutionDef ? `[${tower.evolutionDef.icon} ${tower.evolutionDef.name}]`
         : '[Base]';
-      ctx.fillStyle = tower.fusionDef ? tower.fusionDef.color : '#aaaaee'; ctx.font = 'bold 10px Segoe UI';
+      ctx.fillStyle = tower.evolutionDef ? tower.evolutionDef.color
+        : tower.fusionDef ? tower.fusionDef.color : '#aaaaee';
+      ctx.font = 'bold 10px Segoe UI';
       ctx.fillText(`${tower.def.name} ${role}`, infoRect.x + 27, infoRect.y + 15);
       ctx.fillStyle = '#777788'; ctx.font = '8px Segoe UI';
       const dmgUps = tower.upgradeHistory.filter(h => h === 'damage').length;
@@ -99,6 +108,9 @@ export class UpgradePopupRenderer {
           `Ataque: 50%${ELEMENT_ICONS[pe]}+50%${ELEMENT_ICONS[se]} | Magia: 60%${ELEMENT_ICONS[pe]}+40%${ELEMENT_ICONS[se]}`,
           infoRect.x + 27, infoRect.y + 39,
         );
+      } else if (tower.evolutionDef) {
+        ctx.fillStyle = tower.evolutionDef.color; ctx.font = '7px Segoe UI';
+        ctx.fillText(tower.evolutionDef.roleLabel, infoRect.x + 27, infoRect.y + 39);
       } else {
         const moveLbl = here.length > 1 ? `Mover tudo: ${totalMoveCost}g` : `Mover: ${totalMoveCost}g`;
         ctx.fillText(`Venda: ${getSellRefund(tower)}g | ${moveLbl}`, infoRect.x + 27, infoRect.y + 39);
@@ -115,8 +127,12 @@ export class UpgradePopupRenderer {
       const slRect = { x: px + 16 + bw3 * 2, y: ry, w: bw3, h: actionH };
 
       const upgCost = towerUpgradeCost(tower);
-      const canUp = !maxed && gold >= upgCost;
-      drawButton(ctx, upRect, maxed ? '★ Máx' : `⬆ ${upgCost}g`, canUp ? '#0d1f0d' : '#1a1a1a', canUp ? '#55bb55' : '#445544');
+      const needsEvo = tower.needsEvolution;
+      const canUp = !maxed && !needsEvo && gold >= upgCost;
+      const upLabel = maxed ? '★ Máx' : needsEvo ? '⬆ Evolução!' : `⬆ ${upgCost}g`;
+      const upBg = needsEvo ? '#2a1a00' : canUp ? '#0d1f0d' : '#1a1a1a';
+      const upFg = needsEvo ? '#ffaa44' : canUp ? '#55bb55' : '#445544';
+      drawButton(ctx, upRect, upLabel, upBg, upFg);
       const mvLabel = here.length > 1 ? `📦 ${totalMoveCost}g*` : `📦 ${totalMoveCost}g`;
       drawButton(ctx, mvRect, mvLabel, canMvAll ? '#0d1522' : '#1a1a1a', canMvAll ? '#4499cc' : '#335577');
       drawButton(ctx, slRect, `🏷 ${getSellRefund(tower)}g`, '#220f0f', '#cc5533');
@@ -127,7 +143,46 @@ export class UpgradePopupRenderer {
       ry += actionH + 6;
     });
 
-    if (here.length < 2) {
+    // ── Evolution options ─────────────────────────────────────────────────────
+    if (hasEvolution && evoDefs.length > 0) {
+      const evoCost = Math.round(evoTower!.def.baseCost * GameConfig.get().tower.evolutionCostMult);
+      const canAfford = gold >= evoCost;
+      ctx.fillStyle = '#ffaa44'; ctx.font = 'bold 10px Segoe UI';
+      ctx.fillText(`⚡ Escolha uma Evolução (${evoCost}g):`, px + 10, ry + 12);
+      ry += 16;
+
+      for (const evo of evoDefs) {
+        const evoRect = { x: px + 8, y: ry, w: pw - 16, h: 66 };
+        ctx.fillStyle = canAfford ? '#0e0e1e' : '#0a0a14';
+        roundedRect(ctx, evoRect.x, evoRect.y, evoRect.w, evoRect.h, 8); ctx.fill();
+        ctx.strokeStyle = canAfford ? evo.color + 'aa' : '#333344'; ctx.lineWidth = 1.5;
+        roundedRect(ctx, evoRect.x, evoRect.y, evoRect.w, evoRect.h, 8); ctx.stroke();
+
+        ctx.fillStyle = canAfford ? evo.color : '#555566'; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'left';
+        ctx.fillText(`${evo.icon} ${evo.name}`, evoRect.x + 8, evoRect.y + 14);
+        ctx.fillStyle = canAfford ? '#99aacc' : '#556677'; ctx.font = '8px Segoe UI';
+        ctx.fillText(evo.roleLabel, evoRect.x + 8 + ctx.measureText(`${evo.icon} ${evo.name}  `).width, evoRect.y + 14);
+
+        ctx.fillStyle = '#8899aa'; ctx.font = '8px Segoe UI';
+        wrapTextLeft(ctx, evo.description, evoRect.x + 8, evoRect.y + 26, evoRect.w - 16, 11);
+
+        // Stat indicators
+        ctx.font = '7px Segoe UI';
+        const statY = evoRect.y + 56;
+        const indicators: string[] = [];
+        if (evo.damageMult !== 1) indicators.push(`Dano×${evo.damageMult.toFixed(1)}`);
+        if (evo.fireRateMult !== 1) indicators.push(`Vel×${evo.fireRateMult.toFixed(1)}`);
+        if (evo.rangeMult !== 1) indicators.push(`Alc×${evo.rangeMult.toFixed(1)}`);
+        if (evo.magicDamageMult !== 1) indicators.push(`Magia×${evo.magicDamageMult.toFixed(1)}`);
+        ctx.fillStyle = '#667788';
+        ctx.fillText(indicators.join(' | '), evoRect.x + 8, statY);
+
+        this.upgradeBtns[`evo_${evo.id}`] = evoRect;
+        ry += 72;
+      }
+    }
+
+    if (here.length < 2 && !hasEvolution) {
       ctx.fillStyle = '#888899'; ctx.font = 'bold 9px Segoe UI';
       ctx.fillText('➕ Adicionar 2ª Torre:', px + 10, ry + 12);
       ry += 16;

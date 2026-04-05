@@ -30,8 +30,14 @@ export class OverlayRenderer {
   handleBestiaryTabClick(p: { x: number; y: number }, hit: (p: { x: number; y: number }, r: { x: number; y: number; w: number; h: number }) => boolean) {
     for (let i = 0; i < 4; i++) {
       const r = this.bestiaryRects[`tab_${i}`];
-      if (r && hit(p, r)) { this.bestiaryPage = i; break; }
+      if (r && hit(p, r)) { this.bestiaryPage = i; this.bestiaryScroll = 0; break; }
     }
+  }
+
+  handleBestiaryWheel(deltaY: number, viewH: number) {
+    const startY = 88;
+    const maxScroll = Math.max(0, this.bestiaryContentH - (viewH - startY - 60));
+    this.bestiaryScroll = Math.max(0, Math.min(maxScroll, this.bestiaryScroll + deltaY * 0.5));
   }
 
   renderLevelUp(ctx: CanvasRenderingContext2D, cw: number, ch: number, player: Player) {
@@ -216,7 +222,7 @@ export class OverlayRenderer {
     ctx.textAlign = 'center';
   }
 
-  renderBestiary(ctx: CanvasRenderingContext2D, cw: number, ch: number) {
+  renderBestiary(ctx: CanvasRenderingContext2D, cw: number, ch: number, returnScreen = 'game') {
     this.bestiaryRects = {};
     ctx.fillStyle = '#080814'; ctx.fillRect(0, 0, cw, ch);
     ctx.textAlign = 'center';
@@ -253,7 +259,7 @@ export class OverlayRenderer {
       const cols = 2, bw = (cw - 60) / cols, bh = 170, gap = 10;
       towerRegistry.getAllDefs().forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
         const ec = ELEMENT_COLORS[def.element];
         ctx.fillStyle = '#0d0d20'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = ec + '66'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
@@ -295,7 +301,7 @@ export class OverlayRenderer {
       };
       allEnemies.forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
         ctx.fillStyle = def.isBoss ? '#1a0a1a' : '#0d0d1e';
         roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = def.color + '55'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
@@ -345,7 +351,7 @@ export class OverlayRenderer {
       };
       enemyRegistry.getGolemDefs().forEach((def, i) => {
         const col = i % 2, row = Math.floor(i / 2);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
         const ec = ELEMENT_COLORS[def.golemType!];
         ctx.fillStyle = '#0e0e18'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = ec + '88'; ctx.lineWidth = 2; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();

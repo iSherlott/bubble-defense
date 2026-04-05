@@ -5,11 +5,12 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { TOWER_DEFS } from './towers';
-import { ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS } from './enemies';
+import { ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS, DISABLER_DEFS } from './enemies';
 import { FUSION_DEFS } from './fusions';
 import { ITEM_DEFS } from './items';
+import { EVOLUTION_DEFS } from './evolutions';
 import {
-  towerRegistry, enemyRegistry, fusionRegistry, itemRegistry,
+  towerRegistry, enemyRegistry, fusionRegistry, itemRegistry, evolutionRegistry,
 } from '../registries';
 
 // ── Magic Behaviors ──
@@ -17,6 +18,14 @@ import {
   FireMagicBehavior, WaterMagicBehavior,
   EarthMagicBehavior, WindMagicBehavior,
 } from '../behaviors/MagicBehaviors';
+
+// ── Evolution Magic Behaviors ──
+import {
+  IncineratorMagicBehavior, FlamethrowerMagicBehavior, FurnaceMagicBehavior,
+  CryomancerMagicBehavior, PressureTideMagicBehavior, AbyssalWellMagicBehavior,
+  BallistaMagicBehavior, QuarryMagicBehavior, MonolithMagicBehavior,
+  HarpoonMagicBehavior, BladeStormMagicBehavior, TacticalCycloneMagicBehavior,
+} from '../behaviors/EvolutionMagicBehaviors';
 
 // ── Fusion Behaviors ──
 import {
@@ -30,7 +39,30 @@ import {
 
 // ── Enemy Behaviors ──
 import {
+  // Standard enemy tactical behaviors
+  FlightInstinctBehavior,
+  ThickHideBehavior,
+  LateralBurstBehavior,
+  DefensiveAuraBehavior,
+  TidalRiteBehavior,
+  UpcurrentBehavior,
+  ReactiveShadowBehavior,
+  ElementalTrailBehavior,
+  // Golem anchor behaviors
+  FireAnchorBehavior,
+  WaterAnchorBehavior,
+  EarthAnchorBehavior,
+  WindAnchorBehavior,
+  // Legacy boss behaviors (kept for registry; no longer on bosses)
   SummonAddsBehavior, FireTrailBehavior, ShieldPhaseBehavior,
+  // Disabler (updated with secondary effects)
+  DisablerAuraBehavior,
+  // New boss behaviors
+  ForgeColossusBehavior,
+  TidalLeviathanBehavior,
+  StormQueenBehavior,
+  AbyssGuardianBehavior,
+  PrismaticAvatarBehavior,
 } from '../behaviors/EnemyBehaviors';
 
 // ── Item Effects ──
@@ -59,6 +91,20 @@ registerMagicBehavior('fire',  new FireMagicBehavior());
 registerMagicBehavior('water', new WaterMagicBehavior());
 registerMagicBehavior('earth', new EarthMagicBehavior());
 registerMagicBehavior('wind',  new WindMagicBehavior());
+
+// ── Evolution magic behaviors ──
+registerMagicBehavior('evo_fire_incinerator',    new IncineratorMagicBehavior());
+registerMagicBehavior('evo_fire_flamethrower',   new FlamethrowerMagicBehavior());
+registerMagicBehavior('evo_fire_furnace',        new FurnaceMagicBehavior());
+registerMagicBehavior('evo_water_cryomancer',    new CryomancerMagicBehavior());
+registerMagicBehavior('evo_water_pressure_tide', new PressureTideMagicBehavior());
+registerMagicBehavior('evo_water_abyssal_well',  new AbyssalWellMagicBehavior());
+registerMagicBehavior('evo_earth_ballista',      new BallistaMagicBehavior());
+registerMagicBehavior('evo_earth_quarry',        new QuarryMagicBehavior());
+registerMagicBehavior('evo_earth_monolith',      new MonolithMagicBehavior());
+registerMagicBehavior('evo_wind_harpoon',        new HarpoonMagicBehavior());
+registerMagicBehavior('evo_wind_blade_storm',    new BladeStormMagicBehavior());
+registerMagicBehavior('evo_wind_tactical_cyclone', new TacticalCycloneMagicBehavior());
 
 // ─── Fusion behavior map ───────────────────────────────────────────────────────
 const fusionBehaviors: Record<string, FusionBehavior> = {
@@ -108,9 +154,37 @@ const itemEffects: Record<string, import('../behaviors/types').ItemEffect> = {
 // ─── Enemy behavior instances ──────────────────────────────────────────────
 // Register all behaviors in the behavior registry so they can be looked up by ID.
 // To add a new behavior: create the class, instantiate it here, call registerEnemyBehavior().
+
+// Standard enemy tactical behaviors
+registerEnemyBehavior(new FlightInstinctBehavior());
+registerEnemyBehavior(new ThickHideBehavior());
+registerEnemyBehavior(new LateralBurstBehavior());
+registerEnemyBehavior(new DefensiveAuraBehavior());
+registerEnemyBehavior(new TidalRiteBehavior());
+registerEnemyBehavior(new UpcurrentBehavior());
+registerEnemyBehavior(new ReactiveShadowBehavior());
+registerEnemyBehavior(new ElementalTrailBehavior());
+
+// Golem anchor behaviors
+registerEnemyBehavior(new FireAnchorBehavior());
+registerEnemyBehavior(new WaterAnchorBehavior());
+registerEnemyBehavior(new EarthAnchorBehavior());
+registerEnemyBehavior(new WindAnchorBehavior());
+
+// Legacy boss behaviors (kept for backward compatibility)
 registerEnemyBehavior(new SummonAddsBehavior());
 registerEnemyBehavior(new FireTrailBehavior());
 registerEnemyBehavior(new ShieldPhaseBehavior());
+
+// Disabler (with secondary effects)
+registerEnemyBehavior(new DisablerAuraBehavior());
+
+// New boss behaviors
+registerEnemyBehavior(new ForgeColossusBehavior());
+registerEnemyBehavior(new TidalLeviathanBehavior());
+registerEnemyBehavior(new StormQueenBehavior());
+registerEnemyBehavior(new AbyssGuardianBehavior());
+registerEnemyBehavior(new PrismaticAvatarBehavior());
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -154,7 +228,7 @@ export function registerAllContent(): void {
   }
 
   // ── Enemies (all types — standard, golems, bosses) ─────────────────────────
-  const allEnemyDefs = [...ENEMY_DEFS, ...GOLEM_DEFS, ...BOSS_DEFS];
+  const allEnemyDefs = [...ENEMY_DEFS, ...GOLEM_DEFS, ...DISABLER_DEFS, ...BOSS_DEFS];
   for (const def of allEnemyDefs) {
     enemyRegistry.register({ def, behaviors: resolveBehaviors(def) });
   }
@@ -171,6 +245,11 @@ export function registerAllContent(): void {
   for (const def of ITEM_DEFS) {
     const effect = itemEffects[def.id] ?? { id: def.id };
     itemRegistry.register(def, effect);
+  }
+
+  // ── Evolutions ─────────────────────────────────────────────────────────────
+  for (const def of EVOLUTION_DEFS) {
+    evolutionRegistry.register(def);
   }
 
   // ── Enemy Render Profiles ──────────────────────────────────────────────────

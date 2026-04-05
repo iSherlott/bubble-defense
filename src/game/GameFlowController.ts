@@ -10,7 +10,7 @@ import { generateMap, extendMap } from '../systems/MapGenerator';
 import { saveGame, loadGame, hasSave } from '../services/SaveSystem';
 import { resetTowerIds, createTower } from '../factories/TowerFactory';
 import { resetProjectileIds } from '../factories/ProjectileFactory';
-import { towerRegistry, fusionRegistry } from '../registries';
+import { towerRegistry, fusionRegistry, evolutionRegistry } from '../registries';
 import { INITIAL_GOLD, BASE_LIVES, MAP_TIER_AT } from '../constants';
 import { GameConfig } from '../config';
 
@@ -133,6 +133,10 @@ export class GameFlowController {
       tower.placedCost    = t.placedCost ?? def.baseCost;
       tower.goldSpent     = t.goldSpent  ?? def.baseCost;
       tower.isSecondary   = t.isSecondary ?? (t.slotIndex === 1);
+      if (t.evolutionId) {
+        const evoDef = evolutionRegistry.get(t.evolutionId);
+        if (evoDef) tower.evolutionDef = evoDef;
+      }
       g.towers.push(tower);
     }
 
@@ -163,6 +167,7 @@ export class GameFlowController {
           placedCost: t.placedCost, goldSpent: t.goldSpent,
           isSecondary: t.isSecondary,
           fusionId: t.fusionDef?.id,
+          evolutionId: t.evolutionDef?.id,
         })),
       },
       timestamp: Date.now(),

@@ -46,10 +46,11 @@ interface RenderState {
   getSynergyBonus: (t:Tower) => number;
   getMoveCost: (towers: Tower[]) => number;
   getSellRefund: (t:Tower) => number;
-  gameSpeed: 1 | 2;
+  gameSpeed: 1 | 2 | 4;
   debugMode: boolean;
   pendingAffinity: ElementType;
   mousePos: Vec2;
+  bestiaryReturnScreen?: string;
 }
 
 export class Renderer {
@@ -100,7 +101,7 @@ export class Renderer {
       case 'levelup':   this.overlay.renderLevelUp(this.ctx, this.cw, this.ch, state.player); break;
       case 'talent':    this.overlay.renderTalents(this.ctx, this.cw, this.ch, state.player, state.talentTree); break;
       case 'gameover':  this.overlay.renderGameOver(this.ctx, this.cw, this.ch, state.game.score, state.game.waveManager.currentWave); break;
-      case 'bestiary':  this.overlay.renderBestiary(this.ctx, this.cw, this.ch); break;
+      case 'bestiary':  this.overlay.renderBestiary(this.ctx, this.cw, this.ch, state.bestiaryReturnScreen); break;
     }
   }
 

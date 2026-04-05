@@ -31,9 +31,11 @@ export class Game implements IGameContext {
   screen: GameScreen = 'menu';
   paused = false;
   autoWave = false;
-  gameSpeed: 1 | 2 = 1;
+  gameSpeed: 1 | 2 | 4 = 1;
   debugMode = false;
   pendingAffinity: ElementType = 'fire';
+  /** Tracks which screen to return to when closing the bestiary */
+  bestiaryReturnScreen: GameScreen = 'game';
 
   gold   = INITIAL_GOLD;
   lives  = BASE_LIVES;
@@ -258,6 +260,7 @@ export class Game implements IGameContext {
       debugMode: this.debugMode,
       pendingAffinity: this.pendingAffinity,
       mousePos: this.mousePos,
+      bestiaryReturnScreen: this.bestiaryReturnScreen,
     });
   }
 

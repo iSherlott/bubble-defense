@@ -2,7 +2,7 @@
 
 import type { IGameContext } from '../core/GameContext';
 import type { ItemSystem } from '../systems/ItemSystem';
-import { BASE_LIVES } from '../constants';
+import { BASE_LIVES, MAX_LEVEL } from '../constants';
 import { GameConfig } from '../config';
 
 /**
@@ -17,7 +17,7 @@ export class DebugService {
       case 'gold_1000':  ctx.gold += 1000; break;
       case 'gold_10000': ctx.gold += 10000; break;
       case 'levelup': {
-        if (ctx.player.level < 50) {
+        if (ctx.player.level < MAX_LEVEL) {
           ctx.player.xp = 0;
           ctx.player.level++;
           if (ctx.player.level % 10 === 0) ctx.player.talentPoints++;
@@ -26,7 +26,7 @@ export class DebugService {
         break;
       }
       case 'levelup10': {
-        for (let i = 0; i < 10 && ctx.player.level < 50; i++) {
+        for (let i = 0; i < 10 && ctx.player.level < MAX_LEVEL; i++) {
           ctx.player.level++;
           if (ctx.player.level % 10 === 0) ctx.player.talentPoints++;
           const keys: Array<'strength'|'intelligence'|'dexterity'|'agility'|'luck'|'vitality'> =
@@ -37,7 +37,7 @@ export class DebugService {
         break;
       }
       case 'maxlevel': {
-        while (ctx.player.level < 50) {
+        while (ctx.player.level < MAX_LEVEL) {
           ctx.player.level++;
           if (ctx.player.level % 10 === 0) ctx.player.talentPoints++;
           const keys: Array<'strength'|'intelligence'|'dexterity'|'agility'|'luck'|'vitality'> =

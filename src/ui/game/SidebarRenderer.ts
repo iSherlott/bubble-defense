@@ -110,8 +110,9 @@ export class SidebarRenderer {
       this.gameUIBtns['autoWave'] = autoRect;
 
       const spdRect = { x: sx + 10 + colW + 4, y: indY, w: colW, h: 22 };
-      const fast = state.gameSpeed === 2;
-      drawButton(ctx, spdRect, fast ? '⏩ 2x' : '▶ 1x', fast ? '#2a1a00' : '#1c1c1c', fast ? '#ffaa44' : '#777766');
+      const spdLabel = state.gameSpeed === 4 ? '⏩ 4x' : state.gameSpeed === 2 ? '⏩ 2x' : '▶ 1x';
+      const spdFast = state.gameSpeed > 1;
+      drawButton(ctx, spdRect, spdLabel, spdFast ? '#2a1a00' : '#1c1c1c', spdFast ? '#ffaa44' : '#777766');
       this.gameUIBtns['speedToggle'] = spdRect;
 
       const canExpand = g.currentMapTier < 3 && wm.betweenWaves;

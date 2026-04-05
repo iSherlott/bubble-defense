@@ -7,7 +7,9 @@ import { CELL_SIZE, ELEMENT_COLORS } from '../constants';
 import { GameConfig } from '../config';
 import { towerRegistry } from '../registries';
 import { fusionRegistry } from '../registries';
+import { getMagicBehavior } from '../registries';
 import type { ItemSystem } from './ItemSystem';
+import { MonolithMagicBehavior } from '../behaviors/EvolutionMagicBehaviors';
 
 const cfg = GameConfig.get();
 const EARTH_AOE_BASE = cfg.combat.earthAoeRadius;
@@ -38,6 +40,9 @@ export class CombatSystem {
   update(ctx: IGameContext, dt: number): void {
     const extraProjs: ProjectileData[] = [];
 
+    // Tick monolith aura buffs
+    MonolithMagicBehavior.updateBuffs(dt);
+
     // ── Tower loop ────────────────────────────────────────────────────────────
     for (const tower of ctx.towers) {
       tower.update(dt);
@@ -56,9 +61,12 @@ export class CombatSystem {
       const dmgB     = ctx.talentTree.damageBonusForElement(tower.def.element);
       const synergy  = this.getSynergyBonus(tower, ctx);
       const itemDmgB = this.itemSystem.getDmgBonus(tower.def.element, ctx.items);
-      const baseDmg  = tower.getDamage(ctx.player.stats, dmgB + synergy + itemDmgB, affM);
+      const monoBuff = MonolithMagicBehavior.getBuff(tower.id);
+      const monoDmgB = monoBuff ? monoBuff.damageBuff : 0;
+      const monoSpdB = monoBuff ? monoBuff.speedBuff : 0;
+      const baseDmg  = tower.getDamage(ctx.player.stats, dmgB + synergy + itemDmgB + monoDmgB, affM);
 
-      const didHit   = Math.random() <= ctx.player.hitChance(target.agility);
+      const didHit   = Math.random() <= ctx.player.hitChance(target.agility * (1 + target.tempAgilityBoost));
       const isCrit   = didHit && Math.random() < ctx.player.critChance();
       const critMult = isCrit ? ctx.player.critMultiplier() : 1;
       const dmg      = didHit ? baseDmg * critMult : 0;
@@ -77,7 +85,7 @@ export class CombatSystem {
         components: fusionComponents,
       }));
 
-      const magicReady = tower.onNormalShot(ctx.player.stats, speedB + itemSpeedB, magicSpB + itemMagicChB);
+      const magicReady = tower.onNormalShot(ctx.player.stats, speedB + itemSpeedB + monoSpdB, magicSpB + itemMagicChB);
       if (magicReady) {
         tower.consumeMagicBar();
         this.fireMagic(ctx, tower, affM, extraProjs);
@@ -101,6 +109,24 @@ export class CombatSystem {
     if (tower.fusionDef) {
       this.fireFusionMagic(ctx, tower, affM, extra);
       return;
+    }
+
+    // Evolved tower → delegate to evolution behavior from registry
+    if (tower.evolutionDef) {
+      const evoBehavior = getMagicBehavior(tower.evolutionDef.magicBehaviorId);
+      if (evoBehavior) {
+        evoBehavior.cast(ctx, tower, affM, extra);
+        if (tower.def.magicAnimationId) {
+          ctx.animations.request({
+            id: tower.def.magicAnimationId,
+            sourceX: tower.pixelX,
+            sourceY: tower.pixelY,
+            radius: tower.getRange(),
+            color: tower.evolutionDef.color,
+          });
+        }
+        return;
+      }
     }
 
     // Normal magic → delegate to element behavior from registry
@@ -292,9 +318,9 @@ export class CombatSystem {
           const d = wt.receiveDamage(proj.damage * windDmgMult * wtMult, 'wind');
           if (tw) { tw.totalDamageDealt += d; if (wt.dead) tw.totalKills++; }
           if (wt.def.golemType !== 'wind') {
-            wt.distanceTraveled = Math.max(0, wt.distanceTraveled - windPushPx);
+            const pushed = wt.applyPush(windPushPx);
             if (windStunDur > 0) wt.stunRemaining = Math.max(wt.stunRemaining, windStunDur);
-            ctx.addFT(wt.pos, `💨-${Math.round(windPushPx / CELL_SIZE)}tiles`, '#ccee44');
+            ctx.addFT(wt.pos, `💨-${(pushed / CELL_SIZE).toFixed(1)}t`, '#ccee44');
           } else {
             ctx.addFT(wt.pos, `💨IMUNE`, '#ccee44');
           }
@@ -328,7 +354,7 @@ export class CombatSystem {
     }
     if (elements.includes('wind') && target.def.golemType !== 'wind') {
       const windPushPx = (WIND_PUSH_PX * 0.5) + (this.itemSystem.getWindPushBonus(items) * 0.5);
-      target.distanceTraveled = Math.max(0, target.distanceTraveled - windPushPx);
+      target.applyPush(windPushPx);
     }
   }
 

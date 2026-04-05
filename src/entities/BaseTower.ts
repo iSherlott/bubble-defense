@@ -3,7 +3,7 @@
 //   SingleTower  — normal one-element tower (slot 0 or 1)
 //   FusionTower  — two-tower fusion with combined magic bar max
 
-import type { TowerDef, ElementType, Stats, FusionDef } from '../types';
+import type { TowerDef, ElementType, Stats, FusionDef, EvolutionDef } from '../types';
 import type { BaseEnemy } from './BaseEnemy';
 import { BaseEntity, nextEntityId } from './BaseEntity';
 import { GameConfig } from '../config';
@@ -39,11 +39,17 @@ export abstract class BaseTower extends BaseEntity {
   // Fusion
   fusionDef: FusionDef | null;
 
+  // Evolution
+  evolutionDef: EvolutionDef | null;
+
   // Runtime
   cooldown: number;
   magicBar: number;
   totalDamageDealt: number;
   totalKills: number;
+
+  /** Remaining seconds this tower is disabled by a disabler enemy aura */
+  disabledTimer: number;
 
   constructor(def: TowerDef, gridX: number, gridY: number, slotIndex: 0 | 1 = 0) {
     super();
@@ -70,21 +76,32 @@ export abstract class BaseTower extends BaseEntity {
     this.isSecondary = slotIndex === 1;
 
     this.fusionDef = null;
+    this.evolutionDef = null;
 
     this.cooldown = 0;
     this.magicBar = 0;
     this.totalDamageDealt = 0;
     this.totalKills = 0;
+    this.disabledTimer = 0;
   }
 
   // ─── Level ──────────────────────────────────────────────────────────────────
   get level(): number { return this.upgradeCount + 1; }
   get isMaxLevel(): boolean { return this.upgradeCount >= GameConfig.get().tower.maxLevel; }
 
+  /** Tower is eligible for evolution: reached evolution level, not yet evolved, not fused */
+  get needsEvolution(): boolean {
+    return this.upgradeCount >= GameConfig.get().tower.evolutionLevel
+      && !this.evolutionDef
+      && !this.fusionDef;
+  }
+
   // ─── Magic bar ──────────────────────────────────────────────────────────────
   /** Subclasses may override to apply magicBarMaxMult from fusionDef */
   get effectiveMagicBarMax(): number {
-    return this.def.magicBarMax * (this.fusionDef?.magicBarMaxMult ?? 1);
+    return this.def.magicBarMax
+      * (this.fusionDef?.magicBarMaxMult ?? 1)
+      * (this.evolutionDef?.magicBarMaxMult ?? 1);
   }
 
   magicBarRatio(): number {
@@ -92,23 +109,35 @@ export abstract class BaseTower extends BaseEntity {
   }
 
   // ─── Derived combat stats ────────────────────────────────────────────────────
+  /** Evolution fire rate multiplier (1.0 if not evolved) */
+  private get evoFireRateMult(): number { return this.evolutionDef?.fireRateMult ?? 1; }
+  /** Evolution range multiplier (1.0 if not evolved) */
+  private get evoRangeMult(): number { return this.evolutionDef?.rangeMult ?? 1; }
+  /** Evolution damage multiplier (1.0 if not evolved) */
+  private get evoDamageMult(): number { return this.evolutionDef?.damageMult ?? 1; }
+  /** Evolution magic damage multiplier (1.0 if not evolved) */
+  private get evoMagicDamageMult(): number { return this.evolutionDef?.magicDamageMult ?? 1; }
+
   getFireRate(stats: Stats, talentSpeedBonus: number): number {
-    return this.def.baseFireRate * this.speedMult * ((1 + stats.agility * 0.05) + talentSpeedBonus);
+    return this.def.baseFireRate * this.speedMult * this.evoFireRateMult
+      * ((1 + stats.agility * 0.05) + talentSpeedBonus);
   }
 
   getRange(mult = 1.0): number {
-    return this.def.baseRange * mult;
+    return this.def.baseRange * this.evoRangeMult * mult;
   }
 
   getDamage(stats: Stats, talentDamageBonus: number, affinityMult: number): number {
     return this.def.baseDamage
       * this.damageMult
+      * this.evoDamageMult
       * (1 + stats.strength * 0.05 + talentDamageBonus)
       * affinityMult;
   }
 
   getMagicDamage(stats: Stats, affinityMult: number): number {
-    return this.def.magicBaseDamage * (1 + stats.intelligence * 0.10) * affinityMult;
+    return this.def.magicBaseDamage * this.evoMagicDamageMult
+      * (1 + stats.intelligence * 0.10) * affinityMult;
   }
 
   getEffectiveMagicBarGain(talentMagicSpeedBonus: number): number {
@@ -158,10 +187,16 @@ export abstract class BaseTower extends BaseEntity {
   // ─── Shooting ───────────────────────────────────────────────────────────────
   update(dt: number) {
     if (this.cooldown > 0) this.cooldown -= dt;
+    if (this.disabledTimer > 0) this.disabledTimer -= dt;
   }
 
   canShoot(): boolean {
-    return this.cooldown <= 0;
+    return this.cooldown <= 0 && this.disabledTimer <= 0;
+  }
+
+  /** Whether the tower is currently disabled by a disabler enemy aura */
+  get isDisabled(): boolean {
+    return this.disabledTimer > 0;
   }
 
   onNormalShot(stats: Stats, talentSpeedBonus: number, talentMagicSpeedBonus: number): boolean {

@@ -47,7 +47,7 @@ export interface GameRenderState {
   getSynergyBonus: (t: Tower) => number;
   getMoveCost: (towers: Tower[]) => number;
   getSellRefund: (t: Tower) => number;
-  gameSpeed: 1 | 2;
+  gameSpeed: 1 | 2 | 4;
   debugMode: boolean;
   mousePos: Vec2;
 }
@@ -97,10 +97,12 @@ export class GameRenderer {
 
     if (state.paused) {
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, gw, gh);
+      // Position pause message below the relics (items HUD) bar
+      const pauseY = 60;
       ctx.fillStyle = '#aaaaff'; ctx.font = 'bold 44px Segoe UI'; ctx.textAlign = 'center';
-      ctx.fillText('⏸  PAUSADO', gw / 2, gh / 2);
+      ctx.fillText('⏸  PAUSADO', gw / 2, pauseY);
       ctx.font = '17px Segoe UI'; ctx.fillStyle = '#7777aa';
-      ctx.fillText('P ou ESC para continuar', gw / 2, gh / 2 + 44);
+      ctx.fillText('P ou ESC para continuar', gw / 2, pauseY + 44);
     }
 
     if (state.debugMode) this.debugPanel.render(ctx);

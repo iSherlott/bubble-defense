@@ -56,7 +56,7 @@ export const STAT_ICONS: Record<string, string> = {
 // ─── Content re-exports (backwards compatibility) ─────────────────────────────
 export { ELEMENT_COLORS, ELEMENT_ICONS, ELEMENT_NAMES, ELEMENT_DESCRIPTIONS, OPPOSITE_ELEMENT } from '../content/elements';
 export { TOWER_DEFS } from '../content/towers';
-export { ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS } from '../content/enemies';
+export { ENEMY_DEFS, GOLEM_DEFS, BOSS_DEFS, DISABLER_DEFS } from '../content/enemies';
 export { FUSION_DEFS, getFusionDef } from '../content/fusions';
 export { ITEM_DEFS, ITEM_RARITY_COLORS, ITEM_RARITY_NAMES } from '../content/items';
 export { ARCHETYPE_DEFS } from '../content/archetypes';

@@ -7,7 +7,7 @@ import type { IGameContext } from '../core/GameContext';
 import type { BaseTower } from '../entities/BaseTower';
 import type { OwnedItem } from '../types';
 import { createTower } from '../factories/TowerFactory';
-import { towerRegistry, fusionRegistry } from '../registries';
+import { towerRegistry, fusionRegistry, evolutionRegistry } from '../registries';
 import { GameConfig } from '../config';
 import { UPGRADE_MULT_STEP, DUAL_MAGIC_BASE_CHANCE, DUAL_MAGIC_LUCK_BONUS, MAP_EXPAND_COST } from '../constants';
 import { FusionTower } from '../entities/towers/FusionTower';
@@ -31,11 +31,13 @@ export class TowerService {
     return Math.max(1, Math.round(base * (1 - this.itemSystem.getDiscount(items))));
   }
 
-  /** Per-tower upgrade cost: baseCost × (1 + upgCount × 0.2), minus item discount */
+  /** Per-tower upgrade cost: baseCost × (1 + upgCount × 0.2), minus item discount.
+   *  After evolution, an extra multiplier is applied (postEvolutionCostMult). */
   towerUpgradeCost(tower: BaseTower | undefined, items: OwnedItem[]): number {
     if (!tower) return 50;
     const base = Math.round(tower.def.baseCost * (1 + tower.upgradeCount * 0.2));
-    return Math.max(1, Math.round(base * (1 - this.itemSystem.getDiscount(items))));
+    const evoMul = tower.evolutionDef ? GameConfig.get().tower.postEvolutionCostMult : 1;
+    return Math.max(1, Math.round(base * evoMul * (1 - this.itemSystem.getDiscount(items))));
   }
 
   /** Is the cell full? (max 2 towers per cell) */
@@ -79,9 +81,10 @@ export class TowerService {
     return ctx.gold >= cost;
   }
 
-  /** Can this tower be upgraded? (not maxed, enough gold) */
+  /** Can this tower be upgraded? (not maxed, enough gold, not needing evolution) */
   canUpgrade(ctx: IGameContext, tower: BaseTower): boolean {
     if (tower.isMaxLevel) return false;
+    if (tower.needsEvolution) return false;
     const cost = this.towerUpgradeCost(tower, ctx.items);
     return ctx.gold >= cost;
   }
@@ -154,6 +157,37 @@ export class TowerService {
     return true;
   }
 
+  /** Evolution cost: baseCost × evolutionCostMult, minus item discount */
+  evolutionCost(tower: BaseTower, items: OwnedItem[]): number {
+    const base = tower.def.baseCost * GameConfig.get().tower.evolutionCostMult;
+    return Math.max(1, Math.round(base * (1 - this.itemSystem.getDiscount(items))));
+  }
+
+  /** Apply an evolution to a tower. Costs gold (evolutionCostMult × baseCost). */
+  evolveTower(ctx: IGameContext, tower: BaseTower, evolutionId: string): boolean {
+    if (!tower.needsEvolution) return false;
+    const evoDef = evolutionRegistry.get(evolutionId);
+    if (!evoDef) return false;
+    if (evoDef.element !== tower.def.element) return false;
+
+    const cost = this.evolutionCost(tower, ctx.items);
+    if (ctx.gold < cost) return false;
+    ctx.gold -= cost;
+    tower.goldSpent += cost;
+
+    tower.evolutionDef = evoDef;
+
+    ctx.addFT(
+      { x: tower.pixelX, y: tower.pixelY - 30 },
+      `${evoDef.icon} EVOLUÇÃO: ${evoDef.name}!`, evoDef.color,
+    );
+    ctx.addFT(
+      { x: tower.pixelX, y: tower.pixelY - 50 },
+      evoDef.roleLabel, '#ddddff',
+    );
+    return true;
+  }
+
   /** Fuse the two towers on a cell into a FusionTower */
   fuseTowers(ctx: IGameContext, col: number, row: number): boolean {
     if (!this.canFuse(ctx.towers, col, row)) return false;
@@ -176,6 +210,7 @@ export class TowerService {
     ft.isSecondary    = false;
     ft.cooldown       = primary.cooldown;
     ft.magicBar       = primary.magicBar;
+    ft.evolutionDef   = primary.evolutionDef;
 
     ctx.towers = ctx.towers.filter(t => t.id !== primary.id && t.id !== secondary.id);
     ctx.towers.push(ft);

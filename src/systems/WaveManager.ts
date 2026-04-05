@@ -148,6 +148,19 @@ export class WaveManager {
 
   // ─── Wave Composition (shared by startWave + preview) ─────────────────────
 
+  /** Returns normalized weight array for N types: primary ~55%, secondary ~28%, rest split ~17% */
+  private getTypeWeights(count: number): number[] {
+    if (count <= 1) return [1.0];
+    if (count === 2) return [0.6, 0.4];
+    // Primary 55%, secondary 28%, remainder splits 17%
+    const primary = 0.55;
+    const secondary = 0.28;
+    const remainder = 1 - primary - secondary;
+    const restCount = count - 2;
+    const restEach = remainder / restCount;
+    return [primary, secondary, ...Array(restCount).fill(restEach)];
+  }
+
   private composeWavePool(wave: number): SpawnQueue[] {
     const isBoss = wave % this.rules.bossEveryN === 0;
     const rng = waveRng(wave * 1337 + 7);
@@ -155,23 +168,58 @@ export class WaveManager {
     if (isBoss) {
       const bossDefs = enemyRegistry.getBossDefs();
       const bossIdx = Math.max(0, Math.floor((wave - this.rules.bossEveryN) / this.rules.bossEveryN)) % bossDefs.length;
-      return [{ typeId: bossDefs[bossIdx].id, count: 1, timer: 0, spawned: 0, isBoss: true, isElite: false }];
+      return [{ typeId: bossDefs[bossIdx].id, count: 1, timer: 300, spawned: 0, isBoss: true, isElite: false }];
     }
 
     const pool = getEnemyPool(wave, this.rules);
     const typeCount = Math.min(typeCountForWave(wave, this.rules), pool.length);
+
+    // Collect preferred types from any matching archetype hint
+    const hints = this.rules.archetypeHints ?? [];
+    const preferred = hints
+      .filter(h => wave >= h.fromWave && wave <= h.toWave)
+      .flatMap(h => h.preferredTypeIds)
+      .filter(id => pool.includes(id));
+    const uniquePreferred = [...new Set(preferred)];
+
+    // Fill chosen: prioritise preferred, then random from remainder
     const chosen: string[] = [];
     const poolCopy = [...pool];
-    for (let i = 0; i < typeCount; i++) {
+    for (const id of uniquePreferred) {
+      if (chosen.length >= typeCount) break;
+      const idx = poolCopy.indexOf(id);
+      if (idx !== -1) { chosen.push(poolCopy.splice(idx, 1)[0]); }
+    }
+    // Fill remaining slots randomly
+    while (chosen.length < typeCount && poolCopy.length > 0) {
       const idx = Math.floor(rng() * poolCopy.length);
       chosen.push(poolCopy.splice(idx, 1)[0]);
     }
 
-    const totalCount = Math.round(cfg.enemy.waveBaseCount + wave * cfg.enemy.waveCountPerWave);
-    const perType = Math.max(1, Math.round(totalCount / chosen.length));
+    // ── Micro-variation: within a themed block, swap out one non-primary
+    // preferred type for a random pool type ~40% of the time.
+    // This prevents consecutive waves in the same hint block from being
+    // identical while preserving the first (primary) preferred type.
+    if (uniquePreferred.length >= 2 && poolCopy.length > 0 && chosen.length >= 2) {
+      if (rng() < 0.40) {
+        // Pick a swap candidate from positions 1+ (never swap the primary theme type)
+        const swapIdx = 1 + Math.floor(rng() * (chosen.length - 1));
+        const replacement = poolCopy[Math.floor(rng() * poolCopy.length)];
+        if (replacement !== chosen[0]) {
+          chosen[swapIdx] = replacement;
+        }
+      }
+    }
 
-    const queues: SpawnQueue[] = chosen.map(typeId => ({
-      typeId, count: perType, timer: 0, spawned: 0, isBoss: false, isElite: false,
+    const totalCount = Math.round(cfg.enemy.waveBaseCount + wave * cfg.enemy.waveCountPerWave);
+
+    // Weighted distribution: primary type gets ~55%, secondary ~28%, rest ~17%
+    const weights = this.getTypeWeights(chosen.length);
+    const queues: SpawnQueue[] = chosen.map((typeId, i) => ({
+      typeId,
+      count: Math.max(1, Math.round(totalCount * weights[i])),
+      timer: i === 0 ? 300 : 0,
+      spawned: 0, isBoss: false, isElite: false,
     }));
 
     const elites = eliteCountForWave(wave);

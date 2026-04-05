@@ -64,10 +64,47 @@ export class EntityRenderer {
       ctx.font = `bold 7px Segoe UI`; ctx.textAlign = 'center';
       ctx.fillText(isMax ? '★' : `${tower.level}`, bx, by + 2.5);
     }
+
+    // Disabled overlay (disabler enemy aura)
+    if (tower.isDisabled) {
+      ctx.save();
+      ctx.globalAlpha = 0.45 + 0.15 * Math.sin(Date.now() / 200);
+      ctx.fillStyle = '#000000';
+      ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#ff2222';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      // Crossed-out icon
+      ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 6, y - 6); ctx.lineTo(x + 6, y + 6);
+      ctx.moveTo(x + 6, y - 6); ctx.lineTo(x - 6, y + 6);
+      ctx.stroke();
+      ctx.fillStyle = '#ff6666'; ctx.font = 'bold 7px Segoe UI'; ctx.textAlign = 'center';
+      ctx.fillText('🚫', x, y - r - 6);
+      ctx.restore();
+    }
   }
 
   drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy) {
     const { x, y } = enemy.pos, r = enemy.def.size;
+
+    // Disabler aura radius visualization
+    if (enemy.def.disablerElement && !enemy.dead) {
+      const pulse = 0.3 + 0.2 * Math.sin(Date.now() / 400);
+      const ec = ELEMENT_COLORS[enemy.def.disablerElement];
+      ctx.beginPath(); ctx.arc(x, y, 120, 0, Math.PI * 2);
+      ctx.fillStyle = ec + Math.round(pulse * 25).toString(16).padStart(2, '0');
+      ctx.fill();
+      ctx.strokeStyle = ec + '44';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
     // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
@@ -104,6 +141,29 @@ export class EntityRenderer {
       ?? (baseId !== profileId ? getEnemyRenderProfile(baseId) : undefined)
       ?? defaultDrawFn;
     drawFn(ctx, x, y, r, enemy.def.color, !!enemy.def.isBoss);
+
+    // Anchor: damage reduction ring (earth-tone) ─────────────────────────────
+    if (enemy.tempDamageReduction > 0.05) {
+      const alpha = Math.min(0.8, enemy.tempDamageReduction * 2.5);
+      ctx.strokeStyle = `rgba(160,120,60,${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Anchor: speed boost streaks (wind-tone) ─────────────────────────────────
+    if (enemy.tempSpeedBoost > 1.05) {
+      const alpha = Math.min(0.75, (enemy.tempSpeedBoost - 1) * 3);
+      ctx.strokeStyle = `rgba(180,255,100,${alpha})`;
+      ctx.lineWidth = 2;
+      // Three short trailing arcs suggesting motion
+      for (let i = 0; i < 3; i++) {
+        const startAng = Math.PI * 0.55 + i * Math.PI * 0.3;
+        ctx.beginPath(); ctx.arc(x, y, r + 4 + i, startAng, startAng + Math.PI * 0.2);
+        ctx.stroke();
+      }
+    }
 
     // Slow ring (temp)
     if (enemy.effects.find(e => e.type === 'slow')) {
