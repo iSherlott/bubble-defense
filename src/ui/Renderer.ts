@@ -132,7 +132,7 @@ export class Renderer {
   handleBestiaryTabClick(p: {x:number;y:number}, hit: (p:{x:number;y:number},r:{x:number;y:number;w:number;h:number})=>boolean) {
     this.overlay.handleBestiaryTabClick(p, hit);
   }
-  handleBestiaryWheel(deltaY: number) {
-    this.overlay.handleBestiaryWheel(deltaY, this.ch);
-  }
+  handleBestiaryWheel(deltaY: number) { this.overlay.handleBestiaryWheel(deltaY, this.ch); }
+  setBestiarySource(src: 'game' | 'menu') { this.overlay.setBestiarySource(src); }
+  getBestiarySource() { return this.overlay.getBestiarySource(); }
 }
