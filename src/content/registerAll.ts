@@ -29,12 +29,15 @@ import {
 
 // ── Fusion Behaviors ──
 import {
-  AoeFusionBehavior, InfernoFusionBehavior,
-  StunFusionBehavior, SlowPuddleFusionBehavior,
-  BlizzardFusionBehavior, LightningFusionBehavior,
-  TsunamiFusionBehavior, SolarCoreFusionBehavior,
-  AbyssalVortexFusionBehavior, PrimalQuakeFusionBehavior,
-  EternalHurricaneFusionBehavior, DefaultFusionBehavior,
+  MagmaFusionBehavior, FireballFusionBehavior,
+  SwampFusionBehavior, MudFusionBehavior,
+  SandstormFusionBehavior, TornadoFusionBehavior,
+  SteamFusionBehavior, GeyserFusionBehavior,
+  InfernoFusionBehavior, LightningFusionBehavior,
+  BlizzardFusionBehavior, TsunamiFusionBehavior,
+  SolarCoreFusionBehavior, AbyssalVortexFusionBehavior,
+  PrimalQuakeFusionBehavior, EternalHurricaneFusionBehavior,
+  DefaultFusionBehavior,
 } from '../behaviors/FusionBehaviors';
 
 // ── Enemy Behaviors ──
@@ -77,12 +80,14 @@ import {
   fourTidesCrownEffect, cataclysmRelicEffect,
 } from '../behaviors/ItemEffects';
 
-import type { FusionBehavior } from '../behaviors/types';
+import type { FusionBehavior, ItemEffect } from '../behaviors/types';
 import { registerEnemyRenderProfiles } from './enemyRenderProfiles';
 import { registerAnimations } from './animations';
 import { registerEnemyBehavior, getEnemyBehavior } from '../registries/EnemyBehaviorRegistry';
 import { registerMagicBehavior, getMagicBehavior } from '../registries/MagicBehaviorRegistry';
 import { DEFAULT_WAVE_RULES } from './waveRules';
+import type { EnemyDef } from '../types';
+import type { EnemyBehavior } from '../behaviors/types';
 
 // ─── Magic behavior instances ──────────────────────────────────────────────
 // Register all magic behaviors so they can be looked up by ID.
@@ -108,15 +113,15 @@ registerMagicBehavior('evo_wind_tactical_cyclone', new TacticalCycloneMagicBehav
 
 // ─── Fusion behavior map ───────────────────────────────────────────────────────
 const fusionBehaviors: Record<string, FusionBehavior> = {
-  magma_pool:         new AoeFusionBehavior(true),
-  fireball_aoe:       new AoeFusionBehavior(true),
-  sandstorm:          new AoeFusionBehavior(false),
-  tornado:            new AoeFusionBehavior(false),
+  magma_pool:         new MagmaFusionBehavior(),
+  fireball_aoe:       new FireballFusionBehavior(),
+  sandstorm:          new SandstormFusionBehavior(),
+  tornado:            new TornadoFusionBehavior(),
   inferno:            new InfernoFusionBehavior(),
-  steam:              new StunFusionBehavior(3, 1.5),
-  geyser:             new StunFusionBehavior(3, 1.5),
-  swamp:              new SlowPuddleFusionBehavior(2),
-  mud:                new SlowPuddleFusionBehavior(2),
+  steam:              new SteamFusionBehavior(),
+  geyser:             new GeyserFusionBehavior(),
+  swamp:              new SwampFusionBehavior(),
+  mud:                new MudFusionBehavior(),
   blizzard:           new BlizzardFusionBehavior(),
   lightning:          new LightningFusionBehavior(5),
   tsunami:            new TsunamiFusionBehavior(),
@@ -128,7 +133,7 @@ const fusionBehaviors: Record<string, FusionBehavior> = {
 const defaultFusionBehavior = new DefaultFusionBehavior();
 
 // ─── Item effects map ──────────────────────────────────────────────────────────
-const itemEffects: Record<string, import('../behaviors/types').ItemEffect> = {
+const itemEffects: Record<string, ItemEffect> = {
   ember_sentry:       emberSentryEffect,
   tide_drop:          tideDropEffect,
   runic_pebble:       runicPebbleEffect,
@@ -189,7 +194,7 @@ registerEnemyBehavior(new PrismaticAvatarBehavior());
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Resolve behavior IDs for an EnemyDef (supports both behaviorIds and legacy bossAbility). */
-function resolveBehaviorIds(def: import('../types').EnemyDef): string[] {
+function resolveBehaviorIds(def: EnemyDef): string[] {
   if (def.behaviorIds && def.behaviorIds.length > 0) return def.behaviorIds;
   // Legacy fallback: bossAbility → single-item array
   if (def.bossAbility) return [def.bossAbility];
@@ -197,9 +202,9 @@ function resolveBehaviorIds(def: import('../types').EnemyDef): string[] {
 }
 
 /** Look up EnemyBehavior instances from the behavior registry by IDs. Warns on missing. */
-function resolveBehaviors(def: import('../types').EnemyDef): import('../behaviors/types').EnemyBehavior[] {
+function resolveBehaviors(def: EnemyDef): EnemyBehavior[] {
   const ids = resolveBehaviorIds(def);
-  const result: import('../behaviors/types').EnemyBehavior[] = [];
+  const result: EnemyBehavior[] = [];
   for (const id of ids) {
     const b = getEnemyBehavior(id);
     if (b) { result.push(b); }

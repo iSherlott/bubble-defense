@@ -1,6 +1,6 @@
 import type { BaseTower } from '../entities/BaseTower';
 import type { BaseEnemy } from '../entities/BaseEnemy';
-import type { ProjectileData, Puddle, Vec2, OwnedItem, ItemDropAnim } from '../types';
+import type { ProjectileData, Puddle, Vec2, OwnedItem, ItemDropAnim, GameScreen } from '../types';
 import type { Player } from '../player/Player';
 import type { SkillTree } from '../player/SkillTree';
 import type { WaveManager } from '../systems/WaveManager';
@@ -71,7 +71,7 @@ export interface IGameContext {
    * Request a screen transition through the state machine (respects guards).
    * Prefer this over direct `ctx.screen = ...` assignments.
    */
-  requestScreen(to: import('../types').GameScreen): void;
+  requestScreen(to: GameScreen): void;
 
   // Actions
   addFT(pos: Vec2, text: string, color: string): void;

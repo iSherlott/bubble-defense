@@ -33,7 +33,7 @@ export interface EnemySliceState {
 export interface PhaseSliceState {
   paused: boolean;
   autoWave: boolean;
-  gameSpeed: 1 | 2;
+  gameSpeed: 1 | 2 | 4;
   debugMode: boolean;
 }
 

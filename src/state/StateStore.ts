@@ -26,7 +26,7 @@ import type { IGameContext, FloatingText, BurnZone, ItemState } from '../core/Ga
 import type { SingleTower as Tower } from '../entities/towers/SingleTower';
 import type { AnimationSystem } from '../systems/AnimationSystem';
 
-import { GameState, createInitialState } from './GameState';
+import { type GameState, createInitialState } from './GameState';
 import { TowerSlice }    from './slices/TowerSlice';
 import { EnemySlice }    from './slices/EnemySlice';
 import { PhaseSlice }    from './slices/PhaseSlice';

@@ -56,40 +56,53 @@ Todo item precisa de um `ItemEffect` registrado.
 
 ```typescript
 export interface ItemEffect {
-  id: string;                    // Mesmo id do ItemDef
-  modifyDamage?(base: number, tower: BaseTower, ctx: IGameContext): number;
-  modifySpeed?(base: number, tower: BaseTower, ctx: IGameContext): number;
-  modifyRange?(base: number, tower: BaseTower, ctx: IGameContext): number;
-  modifyMagicCharge?(base: number, tower: BaseTower, ctx: IGameContext): number;
-  modifyGoldPerKill?(base: number, ctx: IGameContext): number;
-  modifyCost?(base: number, tower: BaseTower, ctx: IGameContext): number;
-  modifyXp?(base: number, ctx: IGameContext): number;
-  modifyLivesLost?(base: number, enemy: BaseEnemy, ctx: IGameContext): number;
-  onWaveStart?(ctx: IGameContext): void;
-  onWaveComplete?(ctx: IGameContext): void;
-  onEnemyKill?(ctx: IGameContext, enemy: BaseEnemy, tower: BaseTower): void;
-  onTowerPlace?(ctx: IGameContext, tower: BaseTower): void;
+  id: string;
+
+  // Additive modifier hooks (return the bonus amount to add)
+  modifyDamage?(element: ElementType, stacks: number): number;
+  modifySpeed?(element: ElementType, stacks: number): number;
+  modifyRange?(element: ElementType, stacks: number): number;
+  modifyMagicCharge?(element: ElementType, stacks: number): number;
+  modifyGoldPerKill?(stacks: number): number;
+  modifyCost?(stacks: number): number;
+  modifySlowAura?(stacks: number): number;
+  modifyWindPush?(stacks: number): number;
+  modifyWindStun?(stacks: number): number;
+  modifyWaterSlow?(stacks: number): number;
+  modifyEarthRadius?(stacks: number): number;
+
+  // Multiplicative damage modifiers (return multiplier, e.g. 1.18)
+  modifyHunterDmg?(enemy: BaseEnemy, stacks: number): number;
+  modifyBossDmg?(enemy: BaseEnemy, stacks: number): number;
+
+  // Flag-based effects
+  hasEffect?(effectId: string): boolean;
+  getEffectChance?(effectId: string, stacks: number): number;
+  getEffectValue?(effectId: string, stacks: number): number;
+
+  // Event hooks
+  onWaveStart?(ctx: IGameContext, stacks: number): void;
+  onWaveComplete?(ctx: IGameContext, stacks: number): void;
 }
 ```
 
 ### Tipos de hook
 
-| Tipo | Quando é chamado | Retorno |
-|------|------------------|---------|
-| `modifyDamage` | Ao calcular dano de tiro | número (dano final) |
-| `modifySpeed` | Ao calcular fire rate | número (rate final) |
-| `modifyRange` | Ao calcular alcance | número (range final) |
-| `modifyMagicCharge` | Ao calcular ganho de carga | número (charge final) |
-| `modifyGoldPerKill` | Ao calcular ouro por kill | número (ouro final) |
-| `modifyCost` | Ao calcular custo de torre | número (custo final) |
-| `modifyXp` | Ao calcular XP ganho | número (xp final) |
-| `modifyLivesLost` | Ao calcular vidas perdidas | número (vidas final) |
-| `onWaveStart` | No início de cada wave | void |
-| `onWaveComplete` | No fim de cada wave | void |
-| `onEnemyKill` | Quando inimigo morre | void |
-| `onTowerPlace` | Quando torre é colocada | void |
-
-Hooks `modify*` recebem valor acumulado (pipeline). Se não quer modificar, retorne `base`.
+| Tipo | Parâmetros | Retorno |
+|------|------------|---------|
+| `modifyDamage` | `(element, stacks)` | bônus aditivo de dano |
+| `modifySpeed` | `(element, stacks)` | bônus aditivo de fire rate |
+| `modifyRange` | `(element, stacks)` | bônus aditivo de alcance |
+| `modifyMagicCharge` | `(element, stacks)` | bônus aditivo de carga mágica |
+| `modifyGoldPerKill` | `(stacks)` | bônus aditivo de ouro |
+| `modifyCost` | `(stacks)` | bônus aditivo de custo |
+| `modifyHunterDmg` | `(enemy, stacks)` | multiplicador (ex: 1.18) |
+| `modifyBossDmg` | `(enemy, stacks)` | multiplicador (ex: 1.15) |
+| `hasEffect` | `(effectId)` | boolean — item tem este efeito? |
+| `getEffectChance` | `(effectId, stacks)` | chance do efeito (0–1) |
+| `getEffectValue` | `(effectId, stacks)` | valor numérico do efeito |
+| `onWaveStart` | `(ctx, stacks)` | void |
+| `onWaveComplete` | `(ctx, stacks)` | void |
 
 ### Onde implementar
 
@@ -98,8 +111,8 @@ Hooks `modify*` recebem valor acumulado (pipeline). Se não quer modificar, reto
 ```typescript
 export const infernoCrownEffect: ItemEffect = {
   id: 'inferno_crown',
-  modifyDamage(base: number, tower: BaseTower, ctx: IGameContext): number {
-    return tower.def.element === 'fire' ? base * 1.3 : base;
+  modifyDamage(element: ElementType, stacks: number): number {
+    return element === 'fire' ? 0.30 * stacks : 0;
   },
 };
 ```

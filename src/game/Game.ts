@@ -1,6 +1,6 @@
 import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
 import { CELL_SIZE, BASE_LIVES, INITIAL_GOLD, MAP_TIER_AT } from '../constants';
-import { SingleTower as Tower } from '../entities/towers/SingleTower';
+import type { SingleTower as Tower } from '../entities/towers/SingleTower';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import { Player } from '../player/Player';
 import { SkillTree as TalentTree } from '../player/SkillTree';
@@ -16,7 +16,6 @@ import { EffectSystem } from '../systems/EffectSystem';
 import { EnemyBehaviorSystem } from '../systems/EnemyBehaviorSystem';
 import { RewardSystem } from '../systems/RewardSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
-import { StateStore } from '../state/StateStore';
 
 // ── Extracted Services ────────────────────────────────────────────────────────
 import { TowerService } from '../services/TowerService';
@@ -94,9 +93,6 @@ export class Game implements IGameContext {
   /** Cell size for coordinate conversion */
   readonly cellSize = CELL_SIZE;
 
-  /** Central state store — exposes typed slice managers and the screen FSM. */
-  readonly store!: StateStore;
-
   private lastTime = 0;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -121,12 +117,6 @@ export class Game implements IGameContext {
     this.map = generateMap(1, 0);
     this.renderer = new Renderer(canvas, this.ctx, this.map);
     this.modal = new Modal();
-
-    // State store — wired after player/talentTree/waveManager exist
-    (this as { store: StateStore }).store = new StateStore(this.map);
-    this.store.wire(this.player, this.talentTree, this.waveManager, () => this.gameFlow.hasSaveAvailable());
-    this.store.animations = this.animations;
-    this.store.setAoeFlashHandler((x, y, r) => this.animations.request({ id: 'aoe_flash', sourceX: x, sourceY: y, radius: r }));
 
     this.inputController.setup();
   }
@@ -202,7 +192,7 @@ export class Game implements IGameContext {
     this.animations.request({ id: 'aoe_flash', sourceX: x, sourceY: y, radius });
   }
 
-  requestScreen(to: import('../types').GameScreen): void {
+  requestScreen(to: GameScreen): void {
     this.screen = to;
   }
 

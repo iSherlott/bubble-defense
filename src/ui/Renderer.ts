@@ -1,4 +1,4 @@
-import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
+import type { GameScreen, ProjectileData, Vec2, ElementType, Puddle, OwnedItem, ItemDropAnim, UpgradePopup, FusionTier } from '../types';
 import type { AnimationInstance } from '../types/animation';
 import type { BaseTower as Tower } from '../entities/BaseTower';
 import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
@@ -7,6 +7,7 @@ import type { SkillTree as TalentTree } from '../player/SkillTree';
 import type { WaveManager } from '../systems/WaveManager';
 import type { MapData } from '../systems/MapGenerator';
 import { SIDEBAR_W, WAVE_BAR_H } from '../constants';
+import { ViewportManager } from './ViewportManager';
 import { MenuRenderer } from './MenuRenderer';
 import { EntityRenderer } from './EntityRenderer';
 import { GameRenderer } from './GameRenderer';
@@ -31,7 +32,7 @@ interface RenderState {
     currentMapTier: number;
     items: OwnedItem[];
     itemDropAnim: ItemDropAnim|null;
-    canFuse: boolean;
+    canFuse: FusionTier | false;
     animationInstances: ReadonlyArray<AnimationInstance>;
     mapExpandCost: number;
     canExpandMap: boolean;
@@ -54,9 +55,9 @@ interface RenderState {
 }
 
 export class Renderer {
-  private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private map: MapData;
+  readonly viewport: ViewportManager;
 
   private menu = new MenuRenderer();
   private entity = new EntityRenderer();
@@ -64,10 +65,10 @@ export class Renderer {
   private overlay = new OverlayRenderer();
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, map: MapData) {
-    this.canvas = canvas;
     this.ctx = ctx;
     this.map = map;
     this.gameR = new GameRenderer(this.entity);
+    this.viewport = new ViewportManager(canvas);
     this.resizeCanvas();
   }
 
@@ -78,12 +79,15 @@ export class Renderer {
 
   private resizeCanvas() {
     const { gameWidth, gameHeight } = this.map;
-    this.canvas.width  = gameWidth  + SIDEBAR_W;
-    this.canvas.height = gameHeight + WAVE_BAR_H;
+    const logicalW = gameWidth  + SIDEBAR_W;
+    const logicalH = gameHeight + WAVE_BAR_H;
+    this.viewport.init(logicalW, logicalH);
   }
 
-  private get cw() { return this.canvas.width; }
-  private get ch() { return this.canvas.height; }
+  /** Logical canvas width (CSS pixels, before DPR scaling) */
+  private get cw() { return this.map.gameWidth  + SIDEBAR_W; }
+  /** Logical canvas height (CSS pixels, before DPR scaling) */
+  private get ch() { return this.map.gameHeight + WAVE_BAR_H; }
   private get gw() { return this.map.gameWidth; }
   private get gh() { return this.map.gameHeight; }
 

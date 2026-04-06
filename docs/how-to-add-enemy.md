@@ -89,7 +89,10 @@ export interface EnemyBehavior {
 
 ### Onde implementar
 
-1. Crie a classe em `src/behaviors/EnemyBehaviors.ts`:
+1. Crie a classe no arquivo de behavior adequado:
+   - **Táticos padrão** → `src/behaviors/EnemyBehaviors.ts`
+   - **Golems** → `src/behaviors/GolemAnchorBehaviors.ts`
+   - **Bosses** → `src/behaviors/BossBehaviors.ts`
 
 ```typescript
 export class PhaseShiftBehavior implements EnemyBehavior {
@@ -114,11 +117,46 @@ behaviorIds: ['phase_shift'],
 
 ### Behaviors existentes
 
+**Táticos padrão** (`src/behaviors/EnemyBehaviors.ts`):
+
+| ID | Classe | Efeito |
+|----|--------|--------|
+| `flight_instinct` | `FlightInstinctBehavior` | Burst de velocidade ao ser atingido |
+| `thick_hide` | `ThickHideBehavior` | Redução temporária de dano |
+| `lateral_burst` | `LateralBurstBehavior` | Movimento lateral evasivo |
+| `defensive_aura` | `DefensiveAuraBehavior` | Aura de redução de dano para aliados |
+| `tidal_rite` | `TidalRiteBehavior` | Cura periódica para aliados próximos |
+| `upcurrent` | `UpcurrentBehavior` | Boost de velocidade para aliados |
+| `reactive_shadow` | `ReactiveShadowBehavior` | Resiste ao elemento dominante próximo |
+| `elemental_trail` | `ElementalTrailBehavior` | Deixa trilha que buff aliados |
+| `disabler_aura` | `DisablerAuraBehavior` | Desabilita torres do mesmo elemento + buffs aliados |
+
+**Golem Anchors** (`src/behaviors/GolemAnchorBehaviors.ts`):
+
+| ID | Classe | Efeito |
+|----|--------|--------|
+| `fire_anchor` | `FireAnchorBehavior` | +12% speed aliados + remove burn |
+| `water_anchor` | `WaterAnchorBehavior` | Heal periódico para aliados |
+| `earth_anchor` | `EarthAnchorBehavior` | Redução de 18% dano para aliados |
+| `wind_anchor` | `WindAnchorBehavior` | Rajada periódica de velocidade |
+
+**Legacy Boss** (`src/behaviors/BossBehaviors.ts`):
+
 | ID | Classe | Efeito |
 |----|--------|--------|
 | `summon_adds` | `SummonAddsBehavior` | Invoca adds a cada 25% HP perdido |
 | `fire_trail` | `FireTrailBehavior` | Cria burn zones no caminho |
 | `shield_phase` | `ShieldPhaseBehavior` | Fase de invencibilidade temporária |
+
+**Boss Encounters** (`src/behaviors/BossBehaviors.ts`):
+
+| ID | Classe | Efeito |
+|----|--------|--------|
+| `boss_forge_colossus` | `ForgeColossusBehavior` | Fissuras de lava, rage a 50% HP |
+| `boss_tidal_leviathan` | `TidalLeviathanBehavior` | Fases protegido/vulnerável, heal aliados |
+| `boss_storm_queen` | `StormQueenBehavior` | Summon harpias, burst de velocidade |
+| `boss_abyss_guardian` | `AbyssGuardianBehavior` | Resiste elemento dominante, summon sombras |
+| `boss_prismatic_avatar` | `PrismaticAvatarBehavior` | Cicla 4 fases elementais + fase final |
 
 ## Passo 3 — Render profile (opcional)
 

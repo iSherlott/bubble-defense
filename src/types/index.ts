@@ -167,10 +167,19 @@ export interface EvolutionDef {
   magicBehaviorId: string;
   /** Optional: multiplier on magicBarMax (e.g. 1.5 = slower charge) */
   magicBarMaxMult?: number;
+
+  // ── Animation overrides (fallback to base tower animation if unset) ──
+  /** Primary cast animation (played at tower on magic fire). */
+  magicAnimationId?: string;
+  /** Impact animation (played at target / hit point). */
+  impactAnimationId?: string;
+  /** Persistent zone animation (looping while zone exists, e.g. furnace, abyssal well). */
+  persistentEffectAnimationId?: string;
 }
 
 // ─── Fusion System ────────────────────────────────────────────────────────────
 export type FusionId = string;  // e.g. 'fire+earth' => 'magma'
+export type FusionTier = 'early' | 'late';
 
 export interface FusionDef {
   id: FusionId;
@@ -180,12 +189,24 @@ export interface FusionDef {
   icon: string;
   color: string;
   description: string;
+  /** Short tactical role label (e.g. "Controle Territorial", "Artilharia") */
+  roleLabel: string;
   /** Magic damage multiplier applied on top of primary magic damage */
   magicDamageMult: number;
   /** Multiplier on the magic bar max (e.g. 2 = takes 2× longer to charge) */
   magicBarMaxMult?: number;
   /** Special effect ID */
   specialEffect: string;
+
+  // ── Animation overrides ──
+  /** Primary cast/magic animation (played at tower/target on magic fire). */
+  magicAnimationId?: string;
+  /** Impact animation (played at hit point / target). */
+  impactAnimationId?: string;
+  /** Persistent zone/area animation (looping while zone exists). */
+  persistentEffectAnimationId?: string;
+  /** Chain/trail animation (for chain-hit or traveling effects). */
+  chainAnimationId?: string;
 }
 
 // ─── Item System ──────────────────────────────────────────────────────────────

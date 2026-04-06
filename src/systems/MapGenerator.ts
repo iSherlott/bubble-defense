@@ -1,5 +1,5 @@
 import type { Vec2 } from '../types';
-import { CELL_SIZE, MAP_TIERS, MapTierDef } from '../constants';
+import { CELL_SIZE, MAP_TIERS, type MapTierDef } from '../constants';
 
 export interface MapData {
   cols: number;

@@ -32,13 +32,14 @@ import { describe, it, expect, beforeAll } from 'vitest';
 // ──── Content & Registries ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 import { registerAllContent } from '../content/registerAll';
 import {
-  towerRegistry, enemyRegistry, fusionRegistry, itemRegistry,
+  towerRegistry, enemyRegistry, fusionRegistry, itemRegistry, evolutionRegistry,
 } from '../registries';
 import { getAnimationDef } from '../registries/AnimationRegistry';
 
 // ──── Factories ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 import { createEnemy } from '../factories/EnemyFactory';
 import { createTower } from '../factories/TowerFactory';
+import { FusionTower } from '../entities/towers/FusionTower';
 
 // ──── Systems ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 import { WaveManager } from '../systems/WaveManager';
@@ -58,6 +59,7 @@ import { Player } from '../player/Player';
 import { SkillTree } from '../player/SkillTree';
 import type { IGameContext } from '../core/GameContext';
 import type { OwnedItem } from '../types';
+import { GameConfig } from '../config';
 
 // ════════════════════════════════════════════════════════════════════
 //  Helpers
@@ -244,10 +246,52 @@ describe('Tower Upgrades', () => {
 
     expect(tower.upgradeCount).toBe(upgCountBefore + 1);
   });
+
+  it('evolution is available at the evolution level and can be applied', () => {
+    const ctx = createTestContext();
+    const itemSystem = new ItemSystem();
+    const svc = new TowerService(itemSystem);
+
+    const cell = findPlaceableCell(ctx);
+    if (!cell) return;
+
+    svc.placeTower(ctx, 'fire', cell.col, cell.row, 0);
+    const tower = ctx.towers[0];
+    ctx.gold = 999999;
+
+    const cfg = GameConfig.get().tower;
+
+    // Upgrade to evolution level
+    let safetyCounter = 0;
+    while (tower.upgradeCount < cfg.evolutionLevel && svc.canUpgrade(ctx, tower) && safetyCounter < 50) {
+      svc.upgradeTower(ctx, tower);
+      safetyCounter++;
+    }
+
+    // Tower should now be eligible for evolution
+    expect(tower.needsEvolution).toBe(true);
+    expect(tower.isMaxLevel).toBe(false);
+
+    // Pick the first available evolution for this element
+    const evolutions = evolutionRegistry.getByElement(tower.def.element);
+    expect(evolutions.length).toBeGreaterThan(0);
+    const evoResult = svc.evolveTower(ctx, tower, evolutions[0].id);
+    expect(evoResult).toBe(true);
+    expect(tower.needsEvolution).toBe(false);
+    expect(tower.evolutionDef).toBeDefined();
+
+    // Continue upgrading after evolution until max
+    safetyCounter = 0;
+    while (svc.canUpgrade(ctx, tower) && safetyCounter < 50) {
+      svc.upgradeTower(ctx, tower);
+      safetyCounter++;
+    }
+    expect(tower.isMaxLevel).toBe(true);
+  });
 });
 
 describe('Tower Fusion', () => {
-  it('fuseTowers merges two max-level towers into FusionTower', () => {
+  it('fuseTowers merges two max-level towers into FusionTower (late tier)', () => {
     const ctx = createTestContext();
     const itemSystem = new ItemSystem();
     const svc = new TowerService(itemSystem);
@@ -259,21 +303,138 @@ describe('Tower Fusion', () => {
     svc.placeTower(ctx, 'fire', cell.col, cell.row, 0);
     svc.placeTower(ctx, 'water', cell.col, cell.row, 1);
 
-    // Max out upgrades
+    // Max out upgrades — skip evolution to keep fusion available
     ctx.gold = 999999;
-    const t1 = ctx.towers[0];
-    const t2 = ctx.towers[1];
-    while (!t1.isMaxLevel) svc.upgradeTower(ctx, t1);
-    while (!t2.isMaxLevel) svc.upgradeTower(ctx, t2);
+    for (const tower of [ctx.towers[0], ctx.towers[1]]) {
+      let safety = 0;
+      while (svc.canUpgrade(ctx, tower) && safety < 50) { svc.upgradeTower(ctx, tower); safety++; }
+      expect(tower.isMaxLevel).toBe(true);
+    }
 
-    const canFuse = svc.canFuse(ctx.towers, cell.col, cell.row);
-    if (!canFuse) return; // pair may not have fusion def
+    const fuseTier = svc.canFuse(ctx.towers, cell.col, cell.row);
+    expect(fuseTier).toBe('late');
 
     svc.fuseTowers(ctx, cell.col, cell.row);
 
     // After fusion there should be exactly 1 tower in the cell
     const towersInCell = svc.towersAt(ctx.towers, cell.col, cell.row);
     expect(towersInCell.length).toBe(1);
+    expect(towersInCell[0]).toBeInstanceOf(FusionTower);
+    const ft = towersInCell[0] as FusionTower;
+    expect(ft.fusionTier).toBe('late');
+    expect(ft.fusionPowerScalar).toBe(GameConfig.get().tower.lateFusionPowerScalar);
+  });
+
+  it('canFuse returns early when both towers are level 11+ but not max', () => {
+    const ctx = createTestContext();
+    const itemSystem = new ItemSystem();
+    const svc = new TowerService(itemSystem);
+
+    const cell = findPlaceableCell(ctx);
+    if (!cell) return;
+
+    svc.placeTower(ctx, 'fire', cell.col, cell.row, 0);
+    svc.placeTower(ctx, 'water', cell.col, cell.row, 1);
+    ctx.gold = 999999;
+
+    const cfg = GameConfig.get().tower;
+    // Upgrade both to earlyFusionLevel (upgradeCount >= 10, display level 11)
+    for (const tower of [ctx.towers[0], ctx.towers[1]]) {
+      let safety = 0;
+      while (tower.upgradeCount < cfg.earlyFusionLevel && svc.canUpgrade(ctx, tower) && safety < 50) {
+        svc.upgradeTower(ctx, tower);
+        safety++;
+      }
+      expect(tower.upgradeCount).toBeGreaterThanOrEqual(cfg.earlyFusionLevel);
+    }
+
+    const fuseTier = svc.canFuse(ctx.towers, cell.col, cell.row);
+    expect(fuseTier).toBe('early');
+  });
+
+  it('early fusion yields 75% power scalar', () => {
+    const ctx = createTestContext();
+    const itemSystem = new ItemSystem();
+    const svc = new TowerService(itemSystem);
+
+    const cell = findPlaceableCell(ctx);
+    if (!cell) return;
+
+    svc.placeTower(ctx, 'fire', cell.col, cell.row, 0);
+    svc.placeTower(ctx, 'water', cell.col, cell.row, 1);
+    ctx.gold = 999999;
+
+    const cfg = GameConfig.get().tower;
+    for (const tower of [ctx.towers[0], ctx.towers[1]]) {
+      let safety = 0;
+      while (tower.upgradeCount < cfg.earlyFusionLevel && svc.canUpgrade(ctx, tower) && safety < 50) {
+        svc.upgradeTower(ctx, tower);
+        safety++;
+      }
+    }
+
+    svc.fuseTowers(ctx, cell.col, cell.row);
+    const ft = svc.towersAt(ctx.towers, cell.col, cell.row)[0] as FusionTower;
+    expect(ft.fusionTier).toBe('early');
+    expect(ft.fusionPowerScalar).toBe(cfg.earlyFusionPowerScalar);
+  });
+
+  it('canFuse returns false when either tower has evolved', () => {
+    const ctx = createTestContext();
+    const itemSystem = new ItemSystem();
+    const svc = new TowerService(itemSystem);
+
+    const cell = findPlaceableCell(ctx);
+    if (!cell) return;
+
+    svc.placeTower(ctx, 'fire', cell.col, cell.row, 0);
+    svc.placeTower(ctx, 'water', cell.col, cell.row, 1);
+    ctx.gold = 999999;
+
+    const cfg = GameConfig.get().tower;
+    // Upgrade primary to evolution level and evolve
+    const primary = ctx.towers[0];
+    let safety = 0;
+    while (primary.upgradeCount < cfg.evolutionLevel && svc.canUpgrade(ctx, primary) && safety < 50) {
+      svc.upgradeTower(ctx, primary);
+      safety++;
+    }
+    const evos = evolutionRegistry.getByElement(primary.def.element);
+    if (evos.length > 0) svc.evolveTower(ctx, primary, evos[0].id);
+
+    // Max both out
+    for (const tower of [ctx.towers[0], ctx.towers[1]]) {
+      safety = 0;
+      while (svc.canUpgrade(ctx, tower) && safety < 50) { svc.upgradeTower(ctx, tower); safety++; }
+    }
+
+    // canFuse should be false because primary evolved
+    expect(svc.canFuse(ctx.towers, cell.col, cell.row)).toBe(false);
+  });
+
+  it('fused cell blocks second tower placement', () => {
+    const ctx = createTestContext();
+    const itemSystem = new ItemSystem();
+    const svc = new TowerService(itemSystem);
+
+    const cell = findPlaceableCell(ctx);
+    if (!cell) return;
+
+    svc.placeTower(ctx, 'fire', cell.col, cell.row, 0);
+    svc.placeTower(ctx, 'water', cell.col, cell.row, 1);
+    ctx.gold = 999999;
+
+    const cfg = GameConfig.get().tower;
+    for (const tower of [ctx.towers[0], ctx.towers[1]]) {
+      let safety = 0;
+      while (tower.upgradeCount < cfg.earlyFusionLevel && svc.canUpgrade(ctx, tower) && safety < 50) {
+        svc.upgradeTower(ctx, tower);
+        safety++;
+      }
+    }
+
+    svc.fuseTowers(ctx, cell.col, cell.row);
+    expect(svc.isCellFull(ctx.towers, cell.col, cell.row)).toBe(true);
   });
 });
 

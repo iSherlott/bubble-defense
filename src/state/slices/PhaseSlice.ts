@@ -11,7 +11,7 @@ export class PhaseSlice {
   // ─── Read ──────────────────────────────────────────────────────────────────
   get paused(): boolean       { return this.s.paused; }
   get autoWave(): boolean     { return this.s.autoWave; }
-  get gameSpeed(): 1 | 2      { return this.s.gameSpeed; }
+  get gameSpeed(): 1 | 2 | 4  { return this.s.gameSpeed; }
   get debugMode(): boolean    { return this.s.debugMode; }
 
   // ─── Pause ─────────────────────────────────────────────────────────────────
@@ -25,8 +25,8 @@ export class PhaseSlice {
   toggleAutoWave(): void   { this.s.autoWave = !this.s.autoWave; }
 
   // ─── Speed ─────────────────────────────────────────────────────────────────
-  setSpeed(speed: 1 | 2): void { this.s.gameSpeed = speed; }
-  toggleSpeed(): void { this.s.gameSpeed = this.s.gameSpeed === 1 ? 2 : 1; }
+  setSpeed(speed: 1 | 2 | 4): void { this.s.gameSpeed = speed; }
+  toggleSpeed(): void { this.s.gameSpeed = this.s.gameSpeed === 1 ? 2 : this.s.gameSpeed === 2 ? 4 : 1; }
 
   // ─── Debug ─────────────────────────────────────────────────────────────────
   enableDebug(): void  { this.s.debugMode = true; }

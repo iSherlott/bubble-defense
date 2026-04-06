@@ -15,12 +15,13 @@ src/
 ├── registries/   Registros centrais (TowerRegistry, EnemyRegistry, FusionRegistry, ItemRegistry, AnimationRegistry)
 ├── factories/    Criação de instâncias (TowerFactory, EnemyFactory, ProjectileFactory)
 ├── entities/     Objetos de domínio (BaseTower, BaseEnemy, BaseEntity, subclasses)
-├── behaviors/    Estratégias plugáveis (MagicBehaviors, EnemyBehaviors, FusionBehaviors, ItemEffects)
+├── behaviors/    Estratégias plugáveis (MagicBehaviors, EnemyBehaviors, GolemAnchorBehaviors, BossBehaviors, FusionBehaviors, ItemEffects)
 ├── systems/      Lógica de gameplay por frame (CombatSystem, AnimationSystem, WaveManager, MapGenerator, etc.)
 ├── services/     Serviços de aplicação (TowerService, DebugService, SaveSystem)
 ├── player/       Progressão do jogador (Player, SkillTree, TalentTree)
+├── state/        Camada de estado tipada (StateStore, slices) — infraestrutura para uso futuro
 ├── core/         Interface central (GameContext — contrato entre camadas)
-├── game/         Orquestração (Game.ts, GameFlowController, GameInputController)
+├── game/         Orquestração (Game.ts — fonte de verdade runtime, GameFlowController, GameInputController)
 └── ui/           Renderização pura (Renderer, GameRenderer, sub-renderers)
 ```
 
@@ -62,7 +63,9 @@ Arquivo: `src/content/registerAll.ts`
 
 | Tipo | Dados | Behavior | Visual | Wave |
 |------|-------|----------|--------|------|
-| Inimigo | `content/enemies.ts` | `behaviors/EnemyBehaviors.ts` | `content/enemyRenderProfiles.ts` | `content/waveRules.ts` |
+| Inimigo padrão | `content/enemies.ts` | `behaviors/EnemyBehaviors.ts` | `content/enemyRenderProfiles.ts` | `content/waveRules.ts` |
+| Golem | `content/enemies.ts` | `behaviors/GolemAnchorBehaviors.ts` | `content/enemyRenderProfiles.ts` | `content/waveRules.ts` |
+| Boss | `content/enemies.ts` | `behaviors/BossBehaviors.ts` | `content/enemyRenderProfiles.ts` | `content/waveRules.ts` |
 | Torre | `content/towers.ts` | `behaviors/MagicBehaviors.ts` | (automático por cor) | — |
 | Fusão | `content/fusions.ts` | `behaviors/FusionBehaviors.ts` | (automático por cor) | — |
 | Item | `content/items.ts` | `behaviors/ItemEffects.ts` | — | — |
@@ -79,6 +82,12 @@ Interface central em `core/GameContext.ts`. Todo system/service recebe `ctx: IGa
 - Items: `items` (owned items array)
 - Animações: `animations.request()`
 - Utilidades: `addFT()` (floating text), `triggerAoeFlash()`
+
+### Runtime State: Game.ts
+
+`Game.ts` implementa `IGameContext` e é a **fonte de verdade runtime**. Todas as propriedades de estado (`gold`, `lives`, `towers`, `enemies`, `score`, etc.) vivem diretamente nesta classe. Systems, services e UI operam exclusivamente via `IGameContext`.
+
+A camada `state/` (`StateStore`, slices) existe como infraestrutura tipada para uso futuro (replay, serialização, undo), mas **não é instanciada** nem consumida em runtime atualmente.
 
 ## GameRenderState
 

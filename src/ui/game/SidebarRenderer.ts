@@ -144,6 +144,12 @@ export class SidebarRenderer {
     drawButton(ctx, bstRect, '📖  Mostruário', '#0d0d22', '#8888cc');
     this.gameUIBtns['bestiary'] = bstRect; y += 34;
 
+    // Fullscreen toggle
+    const fsLabel = document.fullscreenElement ? '⛶  Janela (F11)' : '⛶  Tela Cheia (F11)';
+    const fsRect = { x: sx + 10, y, w: bw, h: 22 };
+    drawButton(ctx, fsRect, fsLabel, '#0d0d1a', '#7788aa');
+    this.gameUIBtns['fullscreen'] = fsRect; y += 28;
+
     // Moving tower hint
     if (g.movingTower) {
       ctx.fillStyle = 'rgba(100,200,255,0.15)';

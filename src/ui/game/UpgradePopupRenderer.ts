@@ -1,5 +1,5 @@
 import type { BaseTower as Tower } from '../../entities/BaseTower';
-import type { UpgradePopup } from '../../types';
+import type { UpgradePopup, FusionTier } from '../../types';
 import { CELL_SIZE, ELEMENT_COLORS, ELEMENT_ICONS } from '../../constants';
 import { getFusionDef } from '../../constants';
 import { towerRegistry, evolutionRegistry } from '../../registries';
@@ -26,7 +26,7 @@ export class UpgradePopupRenderer {
     getMoveCost: (towers: Tower[]) => number,
     getSellRefund: (t: Tower) => number,
     gold: number,
-    canFuse = false,
+    canFuse: FusionTier | false = false,
   ) {
     const here = towersAt(popup.col, popup.row);
     const hasSynergy = here.length >= 2;
@@ -36,10 +36,13 @@ export class UpgradePopupRenderer {
     const evoDefs = evoTower ? evolutionRegistry.getByElement(evoTower.def.element) : [];
     const pw = hasEvolution ? 320 : 252;
     const towerH = 60, actionH = 26, headerH = hasSynergy ? 48 : 34, add2H = 60, closeH = 28;
-    const fusionH = canFuse ? 36 : 0;
-    const evoH = hasEvolution ? (16 + evoDefs.length * 72) : 0;
+    const hasFusedTower = here.some(t => t.fusionDef);
+    const fusionH = canFuse ? 60 : 0;
+    const evoWarningH = (hasEvolution && canFuse) ? 12 : 0;
+    const evoH = hasEvolution ? (16 + evoWarningH + evoDefs.length * 72) : 0;
     const towerRows = here.reduce((_ , __) => _ + towerH + actionH + 6, 0);
-    const ph = headerH + towerRows + (here.length < 2 ? add2H : 0) + fusionH + evoH + closeH + 20;
+    const showAdd2nd = here.length < 2 && !hasFusedTower;
+    const ph = headerH + towerRows + (showAdd2nd ? add2H : 0) + fusionH + evoH + closeH + 20;
 
     let px = popup.col * CELL_SIZE + CELL_SIZE + 4;
     let py = popup.row * CELL_SIZE;
@@ -127,11 +130,10 @@ export class UpgradePopupRenderer {
       const slRect = { x: px + 16 + bw3 * 2, y: ry, w: bw3, h: actionH };
 
       const upgCost = towerUpgradeCost(tower);
-      const needsEvo = tower.needsEvolution;
-      const canUp = !maxed && !needsEvo && gold >= upgCost;
-      const upLabel = maxed ? '★ Máx' : needsEvo ? '⬆ Evolução!' : `⬆ ${upgCost}g`;
-      const upBg = needsEvo ? '#2a1a00' : canUp ? '#0d1f0d' : '#1a1a1a';
-      const upFg = needsEvo ? '#ffaa44' : canUp ? '#55bb55' : '#445544';
+      const canUp = !maxed && gold >= upgCost;
+      const upLabel = maxed ? '★ Máx' : `⬆ ${upgCost}g`;
+      const upBg = canUp ? '#0d1f0d' : '#1a1a1a';
+      const upFg = canUp ? '#55bb55' : '#445544';
       drawButton(ctx, upRect, upLabel, upBg, upFg);
       const mvLabel = here.length > 1 ? `📦 ${totalMoveCost}g*` : `📦 ${totalMoveCost}g`;
       drawButton(ctx, mvRect, mvLabel, canMvAll ? '#0d1522' : '#1a1a1a', canMvAll ? '#4499cc' : '#335577');
@@ -147,9 +149,18 @@ export class UpgradePopupRenderer {
     if (hasEvolution && evoDefs.length > 0) {
       const evoCost = Math.round(evoTower!.def.baseCost * GameConfig.get().tower.evolutionCostMult);
       const canAfford = gold >= evoCost;
+      const evoLabel = canFuse
+        ? `⚡ Evoluir OU Fundir (${evoCost}g):`
+        : `⚡ Escolha uma Evolução (${evoCost}g):`;
       ctx.fillStyle = '#ffaa44'; ctx.font = 'bold 10px Segoe UI';
-      ctx.fillText(`⚡ Escolha uma Evolução (${evoCost}g):`, px + 10, ry + 12);
-      ry += 16;
+      ctx.fillText(evoLabel, px + 10, ry + 12);
+      if (canFuse) {
+        ctx.fillStyle = '#ff8888'; ctx.font = '8px Segoe UI';
+        ctx.fillText('⚠ Evoluir bloqueia Fusão permanentemente', px + 10, ry + 24);
+        ry += 28;
+      } else {
+        ry += 16;
+      }
 
       for (const evo of evoDefs) {
         const evoRect = { x: px + 8, y: ry, w: pw - 16, h: 66 };
@@ -182,7 +193,7 @@ export class UpgradePopupRenderer {
       }
     }
 
-    if (here.length < 2 && !hasEvolution) {
+    if (showAdd2nd) {
       ctx.fillStyle = '#888899'; ctx.font = 'bold 9px Segoe UI';
       ctx.fillText('➕ Adicionar 2ª Torre:', px + 10, ry + 12);
       ry += 16;
@@ -210,7 +221,10 @@ export class UpgradePopupRenderer {
       if (primary && secondary) {
         const fusion = getFusionDef(primary.def.element, secondary.def.element);
         if (fusion) {
-          const fusRect = { x: px + 8, y: ry, w: pw - 16, h: 30 };
+          const tierLabel = canFuse === 'late' ? '125%' : '75%';
+          const tierColor = canFuse === 'late' ? '#44ff88' : '#ffaa44';
+          const tierDesc = canFuse === 'late' ? 'Fusão Tardia — poder amplificado!' : 'Fusão Antecipada — poder reduzido';
+          const fusRect = { x: px + 8, y: ry, w: pw - 16, h: 52 };
           ctx.shadowColor = fusion.color; ctx.shadowBlur = 12;
           ctx.fillStyle = '#1a0a2a'; roundedRect(ctx, fusRect.x, fusRect.y, fusRect.w, fusRect.h, 8); ctx.fill();
           ctx.shadowBlur = 0;
@@ -218,12 +232,14 @@ export class UpgradePopupRenderer {
           roundedRect(ctx, fusRect.x, fusRect.y, fusRect.w, fusRect.h, 8); ctx.stroke();
           ctx.lineWidth = 1;
           ctx.fillStyle = fusion.color; ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center';
-          ctx.fillText(`${fusion.icon} FUSÃO: ${fusion.name}`, fusRect.x + fusRect.w / 2, fusRect.y + 14);
+          ctx.fillText(`${fusion.icon} FUSÃO: ${fusion.name} (${tierLabel})`, fusRect.x + fusRect.w / 2, fusRect.y + 14);
+          ctx.fillStyle = tierColor; ctx.font = 'bold 8px Segoe UI';
+          ctx.fillText(tierDesc, fusRect.x + fusRect.w / 2, fusRect.y + 27);
           ctx.fillStyle = '#ccccee'; ctx.font = '8px Segoe UI';
-          ctx.fillText(fusion.description, fusRect.x + fusRect.w / 2, fusRect.y + 25);
+          ctx.fillText(fusion.description, fusRect.x + fusRect.w / 2, fusRect.y + 40);
           ctx.textAlign = 'left';
           this.upgradeBtns['fusion'] = fusRect;
-          ry += 36;
+          ry += 60;
         }
       }
     }

@@ -1,7 +1,8 @@
 import type { IGameContext } from '../core/GameContext';
 import type { BaseTower } from '../entities/BaseTower';
 import type { BaseEnemy } from '../entities/BaseEnemy';
-import type { ProjectileData, ElementType } from '../types';
+import { FusionTower } from '../entities/towers/FusionTower';
+import type { ProjectileData, ElementType, OwnedItem } from '../types';
 import { createProjectile, updateProjectile } from '../factories/ProjectileFactory';
 import { CELL_SIZE, ELEMENT_COLORS } from '../constants';
 import { GameConfig } from '../config';
@@ -26,7 +27,7 @@ export class CombatSystem {
   constructor(private itemSystem: ItemSystem) {}
 
   /** Combined hunter + boss item multiplier for a target. */
-  private itemDamageMult(target: BaseEnemy, items: import('../types').OwnedItem[]): number {
+  private itemDamageMult(target: BaseEnemy, items: OwnedItem[]): number {
     return this.itemSystem.getHunterMult(target, items) * this.itemSystem.getBossMult(target, items);
   }
 
@@ -116,11 +117,16 @@ export class CombatSystem {
       const evoBehavior = getMagicBehavior(tower.evolutionDef.magicBehaviorId);
       if (evoBehavior) {
         evoBehavior.cast(ctx, tower, affM, extra);
-        if (tower.def.magicAnimationId) {
+        // Use evolution-specific animation (fallback to tower def's animation)
+        const animId = tower.evolutionDef.magicAnimationId ?? tower.def.magicAnimationId;
+        if (animId) {
+          const target = tower.findTarget(ctx.enemies);
           ctx.animations.request({
-            id: tower.def.magicAnimationId,
+            id: animId,
             sourceX: tower.pixelX,
             sourceY: tower.pixelY,
+            targetX: target?.pos.x ?? tower.pixelX,
+            targetY: target?.pos.y ?? tower.pixelY,
             radius: tower.getRange(),
             color: tower.evolutionDef.color,
           });
@@ -147,7 +153,8 @@ export class CombatSystem {
 
   private fireFusionMagic(ctx: IGameContext, tower: BaseTower, affM: number, extra: ProjectileData[]): void {
     const fusion = tower.fusionDef!;
-    const baseDmg = tower.getMagicDamage(ctx.player.stats, affM) * fusion.magicDamageMult;
+    const powerScalar = tower instanceof FusionTower ? tower.fusionPowerScalar : 1;
+    const baseDmg = tower.getMagicDamage(ctx.player.stats, affM) * fusion.magicDamageMult * powerScalar;
 
     // Look up fusion behavior from registry
     const blueprint = fusionRegistry.getByEffect(fusion.specialEffect);

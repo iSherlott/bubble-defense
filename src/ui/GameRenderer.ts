@@ -1,4 +1,4 @@
-import type { Vec2, ElementType, OwnedItem, ItemDropAnim, UpgradePopup } from '../types';
+import type { Vec2, ElementType, OwnedItem, ItemDropAnim, UpgradePopup, FusionTier } from '../types';
 import type { AnimationInstance } from '../types/animation';
 import type { BaseTower as Tower } from '../entities/BaseTower';
 import type { BaseEnemy as Enemy } from '../entities/BaseEnemy';
@@ -33,7 +33,7 @@ export interface GameRenderState {
     currentMapTier: number;
     items: OwnedItem[];
     itemDropAnim: ItemDropAnim | null;
-    canFuse: boolean;
+    canFuse: FusionTier | false;
     animationInstances: ReadonlyArray<AnimationInstance>;
     mapExpandCost: number;
     canExpandMap: boolean;

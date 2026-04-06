@@ -18,12 +18,24 @@
       #game-container {
         position: relative;
         user-select: none;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100vw;
+        height: 100vh;
       }
       canvas {
         display: block;
         cursor: pointer;
         border: 2px solid #333;
         box-shadow: 0 0 40px rgba(100,100,255,0.3);
+        /* Crisp pixel rendering for scaled canvas */
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+      }
+      /* Fullscreen styles */
+      #game-container:fullscreen {
+        background: #0a0a0f;
       }
       #modal-overlay {
         display: none;

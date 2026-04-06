@@ -20,6 +20,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.1,
     magicDamageMult: 1.8,
     magicBehaviorId: 'evo_fire_incinerator',
+    magicAnimationId: 'fire_incinerator',
   },
   {
     id: 'fire_flamethrower',
@@ -36,6 +37,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 0.75,
     magicDamageMult: 0.7,
     magicBehaviorId: 'evo_fire_flamethrower',
+    magicAnimationId: 'fire_flamethrower',
   },
   {
     id: 'fire_furnace',
@@ -53,6 +55,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     magicDamageMult: 1.0,
     magicBehaviorId: 'evo_fire_furnace',
     magicBarMaxMult: 0.8,
+    magicAnimationId: 'fire_furnace',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -74,6 +77,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.0,
     magicDamageMult: 0.6,
     magicBehaviorId: 'evo_water_cryomancer',
+    magicAnimationId: 'water_cryomancer',
   },
   {
     id: 'water_pressure_tide',
@@ -90,6 +94,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.0,
     magicDamageMult: 1.2,
     magicBehaviorId: 'evo_water_pressure_tide',
+    magicAnimationId: 'water_pressure_tide',
   },
   {
     id: 'water_abyssal_well',
@@ -106,6 +111,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.1,
     magicDamageMult: 1.0,
     magicBehaviorId: 'evo_water_abyssal_well',
+    magicAnimationId: 'water_abyssal_well',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -127,6 +133,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.4,
     magicDamageMult: 1.6,
     magicBehaviorId: 'evo_earth_ballista',
+    magicAnimationId: 'earth_ballista',
   },
   {
     id: 'earth_quarry',
@@ -143,6 +150,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 0.9,
     magicDamageMult: 1.0,
     magicBehaviorId: 'evo_earth_quarry',
+    magicAnimationId: 'earth_quarry',
   },
   {
     id: 'earth_monolith',
@@ -159,6 +167,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.0,
     magicDamageMult: 0.5,
     magicBehaviorId: 'evo_earth_monolith',
+    magicAnimationId: 'earth_monolith',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -180,6 +189,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.1,
     magicDamageMult: 0.8,
     magicBehaviorId: 'evo_wind_harpoon',
+    magicAnimationId: 'wind_harpoon',
   },
   {
     id: 'wind_blade_storm',
@@ -196,6 +206,7 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.0,
     magicDamageMult: 0.8,
     magicBehaviorId: 'evo_wind_blade_storm',
+    magicAnimationId: 'wind_blade_storm',
   },
   {
     id: 'wind_tactical_cyclone',
@@ -212,5 +223,6 @@ export const EVOLUTION_DEFS: EvolutionDef[] = [
     rangeMult: 1.2,
     magicDamageMult: 0.7,
     magicBehaviorId: 'evo_wind_tactical_cyclone',
+    magicAnimationId: 'wind_tactical_cyclone',
   },
 ];

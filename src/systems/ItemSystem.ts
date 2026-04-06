@@ -1,6 +1,7 @@
 import type { IGameContext } from '../core/GameContext';
 import type { BaseEnemy } from '../entities/BaseEnemy';
 import type { ElementType, OwnedItem, ItemDef } from '../types';
+import type { ItemEffect } from '../behaviors/types';
 import { itemRegistry } from '../registries';
 
 /**
@@ -14,7 +15,7 @@ export class ItemSystem {
   /** Sum an element-typed bonus across all owned items. */
   private sumElementBonus(
     items: OwnedItem[],
-    hook: (effect: import('../behaviors/types').ItemEffect) => ((element: ElementType, stacks: number) => number) | undefined,
+    hook: (effect: ItemEffect) => ((element: ElementType, stacks: number) => number) | undefined,
     element: ElementType,
   ): number {
     let total = 0;
@@ -30,7 +31,7 @@ export class ItemSystem {
   /** Sum a scalar bonus across all owned items. */
   private sumScalarBonus(
     items: OwnedItem[],
-    hook: (effect: import('../behaviors/types').ItemEffect) => ((stacks: number) => number) | undefined,
+    hook: (effect: ItemEffect) => ((stacks: number) => number) | undefined,
   ): number {
     let total = 0;
     for (const owned of items) {
@@ -45,7 +46,7 @@ export class ItemSystem {
   /** Multiply an enemy-typed bonus across all owned items. */
   private multiplyEnemyBonus(
     items: OwnedItem[],
-    hook: (effect: import('../behaviors/types').ItemEffect) => ((enemy: BaseEnemy, stacks: number) => number) | undefined,
+    hook: (effect: ItemEffect) => ((enemy: BaseEnemy, stacks: number) => number) | undefined,
     enemy: BaseEnemy,
   ): number {
     let mult = 1;

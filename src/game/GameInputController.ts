@@ -20,9 +20,12 @@ export class GameInputController {
   private cvPos(e: MouseEvent): Vec2 {
     const c = this.game.canvas;
     const r = c.getBoundingClientRect();
+    // getBoundingClientRect accounts for CSS transform (scale).
+    // canvas.width is DPR-scaled, so divide by DPR to get logical coords.
+    const dpr = this.game.renderer.viewport.dpr;
     return {
-      x: (e.clientX - r.left) * (c.width  / r.width),
-      y: (e.clientY - r.top)  * (c.height / r.height),
+      x: (e.clientX - r.left) * (c.width  / r.width)  / dpr,
+      y: (e.clientY - r.top)  * (c.height / r.height) / dpr,
     };
   }
 
@@ -85,6 +88,7 @@ export class GameInputController {
     if ((e.key === 'a' || e.key === 'A') && g.screen === 'game') g.autoWave = !g.autoWave;
     if ((e.key === 'e' || e.key === 'E') && g.screen === 'game') g.expandMap();
     if (e.key === 'F12') { e.preventDefault(); g.debugMode = !g.debugMode; }
+    if (e.key === 'F11') { e.preventDefault(); g.renderer.viewport.toggleFullscreen(); }
   }
 
   // ─── Screen click handlers ─────────────────────────────────────────────────
@@ -219,6 +223,7 @@ export class GameInputController {
     if (ui['talentBtn']   && this.hit(p, ui['talentBtn']))   { g.requestScreen('talent'); return; }
     if (ui['expandMap']   && this.hit(p, ui['expandMap']))   { g.expandMap(); return; }
     if (ui['bestiary']    && this.hit(p, ui['bestiary']))    { g.bestiaryReturnScreen = 'game'; g.requestScreen('bestiary'); return; }
+    if (ui['fullscreen']  && this.hit(p, ui['fullscreen']))  { g.renderer.viewport.toggleFullscreen(); return; }
     for (const [id, r] of g.renderer.getTowerSelectionRects()) {
       if (this.hit(p, r)) {
         g.selectedTowerType = g.selectedTowerType === id ? '' : id;

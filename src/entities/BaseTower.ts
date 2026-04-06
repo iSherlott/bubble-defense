@@ -96,6 +96,13 @@ export abstract class BaseTower extends BaseEntity {
       && !this.fusionDef;
   }
 
+  /** Tower has passed the evolution level without evolving — evolution is permanently forfeited */
+  get skippedEvolution(): boolean {
+    return this.upgradeCount > GameConfig.get().tower.evolutionLevel
+      && !this.evolutionDef
+      && !this.fusionDef;
+  }
+
   // ─── Magic bar ──────────────────────────────────────────────────────────────
   /** Subclasses may override to apply magicBarMaxMult from fusionDef */
   get effectiveMagicBarMax(): number {
