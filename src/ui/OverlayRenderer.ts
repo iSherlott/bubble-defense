@@ -4,7 +4,7 @@ import type { SkillTree as TalentTree } from '../player/SkillTree';
 import { STAT_LABELS, STAT_DESCRIPTIONS, STAT_ICONS,
   ELEMENT_COLORS, ELEMENT_NAMES, ELEMENT_ICONS,
   TALENT_POINT_EVERY, ITEM_RARITY_COLORS } from '../constants';
-import { towerRegistry, enemyRegistry, itemRegistry } from '../registries';
+import { towerRegistry, evolutionRegistry, fusionRegistry, enemyRegistry, itemRegistry } from '../registries';
 import type { Rect } from './RenderUtils';
 import { drawButton, roundedRect, mulberry32, wrapText, wrapTextLeft } from './RenderUtils';
 
@@ -30,7 +30,7 @@ export class OverlayRenderer {
   setMousePos(pos: { x: number; y: number }) { this._mousePos = pos; }
 
   handleBestiaryTabClick(p: { x: number; y: number }, hit: (p: { x: number; y: number }, r: { x: number; y: number; w: number; h: number }) => boolean) {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       const r = this.bestiaryRects[`tab_${i}`];
       if (r && hit(p, r)) { this.bestiaryPage = i; this.bestiaryScroll = 0; break; }
     }
@@ -233,8 +233,8 @@ export class OverlayRenderer {
     ctx.fillText('📖 Mostruário', cw / 2, 34);
 
     // ─── Tabs ──────────────────────────────────────────────────────────────────
-    const tabs = ['Torres', 'Inimigos', 'Golems', 'Relíquias'];
-    const tw = 155, tgap = 10, totalTW = tabs.length * tw + (tabs.length - 1) * tgap;
+    const tabs = ['Torres', 'Evoluções', 'Fusões', 'Inimigos', 'Golems', 'Relíquias'];
+    const tw = 105, tgap = 8, totalTW = tabs.length * tw + (tabs.length - 1) * tgap;
     const tx0 = cw / 2 - totalTW / 2;
     tabs.forEach((tab, i) => {
       const r = { x: tx0 + i * (tw + tgap), y: 48, w: tw, h: 28 };
@@ -249,6 +249,61 @@ export class OverlayRenderer {
     });
 
     const startY = 90;
+    const viewH = ch - startY - 60;
+
+    // ── Content-height estimation (for scroll clamping) ─────────────────────
+    let contentH = 0;
+    if (this.bestiaryPage === 0) {
+      const n = towerRegistry.getAllDefs().length;
+      contentH = Math.ceil(n / 2) * (170 + 10);
+    } else if (this.bestiaryPage === 1) {
+      const elements: Array<'fire'|'water'|'earth'|'wind'> = ['fire','water','earth','wind'];
+      let totalCards = 0;
+      for (const el of elements) { totalCards += 1 + evolutionRegistry.getByElement(el).length; }
+      contentH = Math.ceil(totalCards / 2) * (155 + 10);
+    } else if (this.bestiaryPage === 2) {
+      const allF = fusionRegistry.getAllDefs();
+      const crossN = allF.filter(f => f.primaryElement !== f.secondaryElement).length;
+      const sameN = allF.filter(f => f.primaryElement === f.secondaryElement).length;
+      // header(2) + cross cards + align + header(2) + same cards
+      let idx = 0;
+      idx += 2; // first header row
+      idx += crossN;
+      if (idx % 2 !== 0) idx += 1; // align before second header
+      idx += 2; // second header row
+      idx += sameN;
+      if (idx % 2 !== 0) idx += 1;
+      contentH = (idx / 2) * (145 + 10);
+    } else if (this.bestiaryPage === 3) {
+      const n = [...enemyRegistry.getStandardDefs(), ...enemyRegistry.getBossDefs()].length;
+      contentH = Math.ceil(n / 2) * (140 + 8);
+    } else if (this.bestiaryPage === 4) {
+      const n = enemyRegistry.getGolemDefs().length;
+      contentH = Math.ceil(n / 2) * (155 + 12);
+    } else {
+      const rarities = ['common', 'rare', 'epic', 'legendary'] as const;
+      const items = itemRegistry.getAllDefs();
+      let idx = 0;
+      for (const r of rarities) {
+        const cnt = items.filter(d => d.rarity === r).length;
+        if (cnt === 0) continue;
+        if (idx % 3 !== 0) idx += 3 - (idx % 3);
+        idx += 3;
+        idx += cnt;
+        const rem = idx % 3;
+        if (rem !== 0) idx += 3 - rem;
+      }
+      contentH = (idx / 3) * (100 + 8);
+    }
+    this.bestiaryContentH = contentH;
+    this.bestiaryScroll = Math.max(0, Math.min(Math.max(0, contentH - viewH), this.bestiaryScroll));
+    const sy = this.bestiaryScroll;
+
+    // ── Clip scrollable area ────────────────────────────────────────────────
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, startY, cw, viewH);
+    ctx.clip();
 
     // ─── Tab 0: Torres ─────────────────────────────────────────────────────────
     if (this.bestiaryPage === 0) {
@@ -261,7 +316,7 @@ export class OverlayRenderer {
       const cols = 2, bw = (cw - 60) / cols, bh = 170, gap = 10;
       towerRegistry.getAllDefs().forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - sy;
         const ec = ELEMENT_COLORS[def.element];
         ctx.fillStyle = '#0d0d20'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = ec + '66'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
@@ -292,8 +347,166 @@ export class OverlayRenderer {
       });
     }
 
-    // ─── Tab 1: Inimigos ───────────────────────────────────────────────────────
+    // ─── Tab 1: Evoluções ───────────────────────────────────────────────────────
     else if (this.bestiaryPage === 1) {
+      const elements: Array<'fire'|'water'|'earth'|'wind'> = ['fire','water','earth','wind'];
+      const cols = 2, bw = (cw - 60) / cols, bh = 155, gap = 10;
+      let cardIdx = 0;
+      for (const el of elements) {
+        const ec = ELEMENT_COLORS[el];
+        const baseDef = towerRegistry.getAllDefs().find(d => d.element === el);
+        // Section header card (base tower)
+        {
+          const col = cardIdx % cols, row = Math.floor(cardIdx / cols);
+          const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - sy;
+          ctx.fillStyle = '#0a0a1a'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
+          ctx.strokeStyle = ec + '44'; ctx.lineWidth = 1; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
+          // Base tower icon
+          if (baseDef) {
+            ctx.fillStyle = baseDef.color;
+            ctx.beginPath(); ctx.arc(bx + 30, by + 32, 18, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = baseDef.accentColor; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.font = '14px serif'; ctx.textAlign = 'center'; ctx.fillStyle = ec;
+            ctx.fillText(ELEMENT_ICONS[el], bx + 30, by + 38);
+          }
+          ctx.textAlign = 'left';
+          ctx.fillStyle = ec; ctx.font = 'bold 12px Segoe UI';
+          ctx.fillText(`${ELEMENT_ICONS[el]} ${baseDef?.name ?? ELEMENT_NAMES[el]}`, bx + 56, by + 20);
+          ctx.fillStyle = '#666688'; ctx.font = '9px Segoe UI';
+          ctx.fillText('Torre Base — Pode evoluir no nível 11', bx + 56, by + 34);
+          if (baseDef) {
+            ctx.fillStyle = '#555577'; ctx.font = '9px Segoe UI';
+            ctx.fillText(`Dano: ${baseDef.baseDamage}  Alcance: ${baseDef.baseRange}  Cadência: ${baseDef.baseFireRate}/s`, bx + 56, by + 48);
+          }
+          ctx.fillStyle = '#445566'; ctx.font = '9px Segoe UI';
+          wrapTextLeft(ctx, baseDef?.description ?? '', bx + 10, by + 68, bw - 20, 12);
+          // Label
+          ctx.fillStyle = '#555577'; ctx.font = 'bold 8px Segoe UI'; ctx.textAlign = 'right';
+          ctx.fillText('BASE', bx + bw - 10, by + 14); ctx.textAlign = 'left';
+          cardIdx++;
+        }
+        // Evolution cards
+        const evos = evolutionRegistry.getByElement(el);
+        for (const evo of evos) {
+          const col = cardIdx % cols, row = Math.floor(cardIdx / cols);
+          const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - sy;
+          ctx.fillStyle = '#0d0d28'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
+          ctx.strokeStyle = evo.color + '88'; ctx.lineWidth = 2; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
+          // Glow accent
+          ctx.shadowColor = evo.color; ctx.shadowBlur = 6;
+          ctx.fillStyle = evo.color;
+          ctx.beginPath(); ctx.arc(bx + 30, by + 32, 16, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.font = '14px "Segoe UI Emoji", serif'; ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(evo.icon, bx + 30, by + 38);
+          // Info
+          ctx.textAlign = 'left';
+          ctx.fillStyle = evo.color; ctx.font = 'bold 12px Segoe UI';
+          ctx.fillText(`${evo.icon} ${evo.name}`, bx + 56, by + 20);
+          ctx.fillStyle = '#aaaacc'; ctx.font = 'bold 9px Segoe UI';
+          ctx.fillText(evo.roleLabel, bx + 56, by + 33);
+          // Mult stats
+          const dm = evo.damageMult, fr = evo.fireRateMult, rn = evo.rangeMult, md = evo.magicDamageMult;
+          ctx.fillStyle = '#777799'; ctx.font = '8px Segoe UI';
+          ctx.fillText(`Dano ×${dm}  Cadência ×${fr}  Alcance ×${rn}  Magia ×${md}`, bx + 56, by + 46);
+          // Description
+          ctx.fillStyle = '#6688aa'; ctx.font = '9px Segoe UI';
+          wrapTextLeft(ctx, evo.description, bx + 10, by + 64, bw - 20, 12);
+          // Strengths/weaknesses
+          ctx.fillStyle = '#55cc77'; ctx.font = '8px Segoe UI';
+          wrapTextLeft(ctx, `✔ ${evo.strengths}`, bx + 10, by + bh - 36, bw - 20, 10);
+          ctx.fillStyle = '#cc5555'; ctx.font = '8px Segoe UI';
+          wrapTextLeft(ctx, `✖ ${evo.weaknesses}`, bx + 10, by + bh - 16, bw - 20, 10);
+          // Label
+          ctx.fillStyle = evo.color; ctx.font = 'bold 8px Segoe UI'; ctx.textAlign = 'right';
+          ctx.fillText('EVOLUÇÃO', bx + bw - 10, by + 14); ctx.textAlign = 'left';
+          cardIdx++;
+        }
+      }
+    }
+
+    // ─── Tab 2: Fusões ─────────────────────────────────────────────────────────
+    else if (this.bestiaryPage === 2) {
+      const allFusions = fusionRegistry.getAllDefs();
+      const crossFusions = allFusions.filter(f => f.primaryElement !== f.secondaryElement);
+      const sameFusions = allFusions.filter(f => f.primaryElement === f.secondaryElement);
+      const cols = 2, bw = (cw - 60) / cols, bh = 145, gap = 10;
+      let cardIdx = 0;
+      // Section: Cross-element fusions
+      const drawSectionHeader = (label: string, color: string) => {
+        if (cardIdx % cols !== 0) { cardIdx += cols - (cardIdx % cols); }
+        const hy = startY + Math.floor(cardIdx / cols) * (bh + gap) - sy;
+        ctx.fillStyle = color + '22';
+        roundedRect(ctx, 30, hy - 2, cw - 60, 22, 4); ctx.fill();
+        ctx.fillStyle = color; ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center';
+        ctx.fillText(label, cw / 2, hy + 13);
+        ctx.textAlign = 'left';
+        cardIdx += cols;
+      };
+      drawSectionHeader('⚔  FUSÕES ELEMENTAIS', '#8888ff');
+      const drawFusionCard = (def: typeof allFusions[0]) => {
+        const col = cardIdx % cols, row = Math.floor(cardIdx / cols);
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - sy;
+        const pc = ELEMENT_COLORS[def.primaryElement], sc = ELEMENT_COLORS[def.secondaryElement];
+        const isSame = def.primaryElement === def.secondaryElement;
+        // Premium background
+        ctx.fillStyle = isSame ? '#14102a' : '#0c0c22';
+        roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
+        // Dual-color border
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = pc; ctx.beginPath();
+        ctx.moveTo(bx + 10, by); ctx.lineTo(bx + bw - 10, by);
+        ctx.arcTo(bx + bw, by, bx + bw, by + 10, 10);
+        ctx.lineTo(bx + bw, by + bh / 2); ctx.stroke();
+        ctx.strokeStyle = sc; ctx.beginPath();
+        ctx.moveTo(bx + bw, by + bh / 2);
+        ctx.lineTo(bx + bw, by + bh - 10);
+        ctx.arcTo(bx + bw, by + bh, bx + bw - 10, by + bh, 10);
+        ctx.lineTo(bx + 10, by + bh);
+        ctx.arcTo(bx, by + bh, bx, by + bh - 10, 10);
+        ctx.lineTo(bx, by + 10);
+        ctx.arcTo(bx, by, bx + 10, by, 10); ctx.stroke();
+        // Icon with glow
+        ctx.shadowColor = def.color; ctx.shadowBlur = 10;
+        ctx.fillStyle = def.color;
+        ctx.font = '22px "Segoe UI Emoji", serif'; ctx.textAlign = 'center';
+        ctx.fillText(def.icon, bx + 28, by + 36);
+        ctx.shadowBlur = 0;
+        // Element combo
+        ctx.font = '10px serif';
+        ctx.fillStyle = pc; ctx.fillText(ELEMENT_ICONS[def.primaryElement], bx + 16, by + 54);
+        ctx.fillStyle = '#555577'; ctx.fillText('+', bx + 28, by + 54);
+        ctx.fillStyle = sc; ctx.fillText(ELEMENT_ICONS[def.secondaryElement], bx + 40, by + 54);
+        // Name & role
+        ctx.textAlign = 'left';
+        ctx.fillStyle = def.color; ctx.font = 'bold 13px Segoe UI';
+        ctx.fillText(def.name, bx + 56, by + 20);
+        ctx.fillStyle = '#aaaacc'; ctx.font = 'bold 9px Segoe UI';
+        ctx.fillText(def.roleLabel, bx + 56, by + 33);
+        // Element names
+        ctx.fillStyle = '#666688'; ctx.font = '8px Segoe UI';
+        ctx.fillText(`${ELEMENT_NAMES[def.primaryElement]} + ${ELEMENT_NAMES[def.secondaryElement]}`, bx + 56, by + 45);
+        // Stats
+        ctx.fillStyle = '#777799'; ctx.font = '8px Segoe UI';
+        ctx.fillText(`Dano mágico ×${def.magicDamageMult}`, bx + 56, by + 57);
+        // Description
+        ctx.fillStyle = '#7799bb'; ctx.font = '9px Segoe UI';
+        wrapTextLeft(ctx, def.description, bx + 10, by + 76, bw - 20, 12);
+        // Label
+        ctx.fillStyle = isSame ? '#ffcc44' : def.color;
+        ctx.font = 'bold 8px Segoe UI'; ctx.textAlign = 'right';
+        ctx.fillText(isSame ? 'FUSÃO APEX' : 'FUSÃO', bx + bw - 10, by + 14);
+        ctx.textAlign = 'left';
+        cardIdx++;
+      };
+      for (const f of crossFusions) drawFusionCard(f);
+      drawSectionHeader('👑  FUSÕES APEX (mesmo elemento)', '#ffcc44');
+      for (const f of sameFusions) drawFusionCard(f);
+    }
+
+    // ─── Tab 3: Inimigos ───────────────────────────────────────────────────────
+    else if (this.bestiaryPage === 3) {
       const allEnemies = [...enemyRegistry.getStandardDefs(), ...enemyRegistry.getBossDefs()];
       const cols = 2, bw = (cw - 60) / cols, bh = 140, gap = 8;
       const bossAbilityDesc: Record<string, string> = {
@@ -303,7 +516,7 @@ export class OverlayRenderer {
       };
       allEnemies.forEach((def, i) => {
         const col = i % cols, row = Math.floor(i / cols);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - sy;
         ctx.fillStyle = def.isBoss ? '#1a0a1a' : '#0d0d1e';
         roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = def.color + '55'; ctx.lineWidth = 1.5; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
@@ -342,8 +555,8 @@ export class OverlayRenderer {
       });
     }
 
-    // ─── Tab 2: Golems ─────────────────────────────────────────────────────────
-    else if (this.bestiaryPage === 2) {
+    // ─── Tab 4: Golems ─────────────────────────────────────────────────────────
+    else if (this.bestiaryPage === 4) {
       const bw = (cw - 60) / 2, bh = 155, gap = 12;
       const golemAbilities: Record<string, string> = {
         fire:  '🔥 Imune a qualquer dano com componente de Fogo',
@@ -353,7 +566,7 @@ export class OverlayRenderer {
       };
       enemyRegistry.getGolemDefs().forEach((def, i) => {
         const col = i % 2, row = Math.floor(i / 2);
-        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - scrollY;
+        const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - sy;
         const ec = ELEMENT_COLORS[def.golemType!];
         ctx.fillStyle = '#0e0e18'; roundedRect(ctx, bx, by, bw, bh, 10); ctx.fill();
         ctx.strokeStyle = ec + '88'; ctx.lineWidth = 2; roundedRect(ctx, bx, by, bw, bh, 10); ctx.stroke();
@@ -380,8 +593,8 @@ export class OverlayRenderer {
       });
     }
 
-    // ─── Tab 3: Relíquias ──────────────────────────────────────────────────────
-    else {
+    // ─── Tab 5: Relíquias ──────────────────────────────────────────────────────
+    else if (this.bestiaryPage === 5) {
       const rarityOrder = ['common', 'rare', 'epic', 'legendary'] as const;
       const rarityLabel: Record<string, string> = {
         common: 'Comum', rare: 'Rara', epic: 'Épica', legendary: 'Lendária',
@@ -397,7 +610,7 @@ export class OverlayRenderer {
         // Rarity section header
         if (globalIdx % cols !== 0) globalIdx += cols - (globalIdx % cols); // align to row start
         const hRow = Math.floor(globalIdx / cols);
-        const hY = startY + hRow * (bh + gap);
+        const hY = startY + hRow * (bh + gap) - sy;
         const rc = ITEM_RARITY_COLORS[rarity];
         ctx.fillStyle = rc + '33';
         roundedRect(ctx, 30, hY - 4, cw - 60, 18, 4); ctx.fill();
@@ -408,7 +621,7 @@ export class OverlayRenderer {
 
         for (const def of group) {
           const col = globalIdx % cols, row = Math.floor(globalIdx / cols);
-          const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap);
+          const bx = 30 + col * (bw + gap), by = startY + row * (bh + gap) - sy;
           const rc2 = ITEM_RARITY_COLORS[def.rarity];
 
           ctx.fillStyle = def.rarity === 'legendary' ? '#1a1000'
@@ -441,6 +654,20 @@ export class OverlayRenderer {
         const rem = globalIdx % cols;
         if (rem !== 0) globalIdx += cols - rem;
       }
+    }
+
+    ctx.restore();
+
+    // ── Scrollbar ───────────────────────────────────────────────────────────
+    if (contentH > viewH) {
+      const trackX = cw - 14, trackW = 8;
+      ctx.fillStyle = '#1a1a2e';
+      roundedRect(ctx, trackX, startY, trackW, viewH, 4); ctx.fill();
+      const thumbH = Math.max(30, (viewH / contentH) * viewH);
+      const maxSy = contentH - viewH;
+      const thumbY = startY + (sy / maxSy) * (viewH - thumbH);
+      ctx.fillStyle = '#6666aaaa';
+      roundedRect(ctx, trackX, thumbY, trackW, thumbH, 4); ctx.fill();
     }
 
     // ─── Back button ───────────────────────────────────────────────────────────

@@ -35,6 +35,10 @@ export class FusionRegistry {
     return this.byPair.has(this.pairKey(primary, secondary));
   }
 
+  getAllDefs(): FusionDef[] {
+    return Array.from(this.byPair.values()).map(bp => bp.def);
+  }
+
   private pairKey(a: string, b: string): string {
     return `${a}+${b}`;
   }
